@@ -1,0 +1,290 @@
+/* ---------- Button ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 0.15s, box-shadow 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.primary {
+  background: var(--brand-red);
+  color: #fff;
+}
+.primary:hover,
+.primary.glow {
+  background: var(--brand-red-hover);
+  box-shadow: var(--shadow-glow-red);
+}
+.secondary {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-body);
+  font-weight: 500;
+}
+.secondary:hover {
+  background: #14213a;
+  color: #fff;
+}
+.link {
+  color: var(--accent-cyan);
+  font-weight: 600;
+  gap: 6px;
+}
+.link:hover {
+  text-decoration: underline;
+}
+.sizeBlock {
+  width: 100%;
+  height: 36px;
+  font-size: 14px;
+}
+.sizeAuth {
+  width: 100%;
+  height: 46px;
+  font-size: 14px;
+}
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+.pill {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+}
+.chip {
+  height: 22px;
+  padding: 0 11px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+}
+.tag {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+}
+.count {
+  height: 18px;
+  min-width: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 700;
+}
+.mini {
+  height: 17px;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.outline {
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+}
+.total {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ---------- Checkbox ---------- */
+.checkbox {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--cb-border, #2f4a72);
+  background: transparent;
+  color: var(--cb-check, #fff);
+  flex: none;
+  padding: 0;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.checkbox:hover {
+  border-color: var(--cb-checked-border, var(--accent-cyan));
+}
+.checkboxOn {
+  background: var(--cb-checked-bg, transparent);
+  border-color: var(--cb-checked-border, var(--accent-cyan));
+  color: var(--cb-checked-check, var(--accent-cyan));
+}
+
+/* ---------- Pagination ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pagerBtn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.pagerBtn:hover:not(:disabled) {
+  color: #fff;
+}
+/* The designs draw both chevrons at full strength even on a single page. */
+.pagerBtn:disabled {
+  cursor: default;
+}
+.pagerBoxed .pagerBtn:not(.pagerActive) {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+.pagerActive {
+  background: var(--brand-red);
+  color: #fff;
+}
+.pagerBoxed .pagerActive {
+  background: #e11d48;
+}
+
+/* ---------- Row actions ---------- */
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  vertical-align: middle;
+}
+.actionBtn {
+  display: inline-grid;
+  place-items: center;
+  color: var(--ra-color, var(--icon-inline));
+  transition: color 0.12s;
+}
+.actionBtn:hover {
+  color: #fff;
+}
+.actionDelete {
+  color: #c62828;
+}
+.actionDelete:hover {
+  color: #ef4444;
+}
+.actionsBoxed {
+  gap: 6px;
+}
+.actionsBoxed .actionBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: #0c1a30;
+}
+.actionsBoxed .actionDelete {
+  color: #e53935;
+}
+.actionEdit {
+  color: #2f7bea;
+}
+.actionsBoxed .actionEdit {
+  color: #2f7bea;
+}
+.actionsBoxed .actionBtn:not(.actionEdit):not(.actionDelete) {
+  color: #cbd5e1;
+}
+
+/* ---------- Add row ---------- */
+.addRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--brand-red);
+}
+.addRowBlue {
+  color: var(--text-secondary);
+}
+.addPlus {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--brand-red);
+  color: #fff;
+}
+.addRow:hover .addPlus {
+  background: var(--brand-red-hover);
+}
+.addPlusBlue {
+  background: none;
+  color: #3b82c4;
+  width: 18px;
+}
+
+/* ---------- Form fields ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input {
+  width: 100%;
+  height: 41px;
+  padding: 0 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+.input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 236, 252, 0.25);
+}
+.inputPassword {
+  height: 48px;
+  padding-right: 48px;
+}
+.eye {
+  position: absolute;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-cyan);
+  width: 28px;
+  height: 28px;
+}

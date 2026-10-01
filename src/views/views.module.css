@@ -1,0 +1,118 @@
+/* Cell-level text treatments shared by the table views (design-system §6.5). */
+.strong {
+  font-weight: 600;
+  color: var(--text-body);
+}
+.b6 {
+  font-weight: 600;
+}
+.cLight {
+  color: #e2eeff;
+}
+.cCell {
+  color: #f2f5fa;
+}
+.cPale {
+  color: #c8d8e8;
+}
+.cIce {
+  color: #d4e0f7;
+}
+.cInk {
+  color: #4d6485;
+}
+.cGrey2 {
+  color: #8a99ad;
+}
+.cPackets {
+  color: #c8d4e6;
+}
+.cAcr {
+  color: #7eb3e0;
+}
+.white {
+  font-weight: 700;
+  color: #fff;
+}
+.body {
+  color: var(--text-cell);
+}
+.secondary {
+  color: var(--text-secondary);
+}
+.dim {
+  color: #7d8ba0;
+}
+.dimBlue {
+  color: var(--text-dim);
+}
+.muted {
+  color: var(--text-muted);
+}
+.cyan {
+  color: var(--accent-cyan);
+}
+.link {
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+.linkSoft {
+  color: var(--accent-link);
+}
+.mono {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.small {
+  font-size: 12px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+.chipsTight {
+  gap: 4px 6px;
+}
+.groupLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.iconCheck {
+  display: inline-grid;
+  place-items: center;
+  vertical-align: middle;
+  color: var(--success);
+}
+.iconDash {
+  color: #1e3a5f;
+}
+.thWithIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.gap8 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.thumb {
+  display: block;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.rowNum {
+  font-size: 12px;
+  color: #4a6b8a;
+}
+.soft {
+  color: #9ac0da;
+}
+.title {
+  color: #cbd5e1;
+}

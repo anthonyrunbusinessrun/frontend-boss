@@ -1,0 +1,171 @@
+/* Table theming is driven by --t-* custom properties set per view
+   (see table/theme.ts). Defaults follow the Profiles screen. */
+.wrap {
+  position: relative;
+  width: 100%;
+  background: var(--t-row-a, #0f172a);
+  border: 1px solid var(--t-border, #1e3a5f);
+  border-radius: var(--t-radius, 8px 8px 0 0);
+  overflow: clip;
+}
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  color: var(--t-cell-color, #f2f5fa);
+  font-size: 13px;
+}
+
+/* ---------- Header ---------- */
+.th,
+.td,
+.sumTd {
+  border-right: 1px solid var(--t-col-border, transparent);
+}
+.th:last-child,
+.td:last-child,
+.sumTd:last-child {
+  border-right-color: transparent;
+}
+.selCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: calc(var(--t-head-h, 36px) + var(--t-head-bw, 1px));
+  padding: 0 16px 0 0;
+  background: var(--t-head-bg, #0b1f3a);
+  border-bottom: var(--t-head-bw, 1px) solid var(--t-head-border, #1e3a5f);
+  color: var(--t-head-color, #94a3b8);
+  font-size: var(--t-head-size, 11px);
+  font-weight: var(--t-head-weight, 600);
+  letter-spacing: var(--t-head-ls, 0.06em);
+  text-transform: var(--t-head-tf, uppercase);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.thFirst {
+  padding-left: 16px;
+}
+/* ---------- Rows ---------- */
+.td {
+  height: calc(var(--t-row-h, 48px) + var(--t-row-bw, 0px));
+  padding: var(--t-row-pady, 0) 16px var(--t-row-pady, 0) 0;
+  border-bottom: var(--t-row-bw, 0) solid var(--t-row-border, transparent);
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdFirst {
+  padding-left: 16px;
+}
+.tdWrap {
+  white-space: normal;
+}
+.rowA .td {
+  background: var(--t-row-a, #0f172a);
+}
+.rowB .td {
+  background: var(--t-row-b, #0b1220);
+}
+.row:hover .td {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.035));
+}
+.rowSelected .td {
+  background-color: var(--t-selected-bg, #152d41);
+}
+.rowSelected .td:first-child {
+  box-shadow: inset 3px 0 0 var(--t-selected-bar, transparent);
+}
+
+/* ---------- Group header ---------- */
+.groupTd {
+  height: calc(var(--t-group-h, 34px) + var(--t-group-bw, 1px));
+  padding: 0 16px;
+  background: var(--t-group-bg, #0b1220);
+  border-bottom: var(--t-group-bw, 1px) solid var(--t-group-border, #1e3a5f);
+}
+.groupBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--t-group-color, #fff);
+  font-size: var(--t-group-size, 12px);
+  font-weight: var(--t-group-weight, 700);
+  letter-spacing: var(--t-group-ls, 0);
+  text-transform: var(--t-group-tf, none);
+  white-space: nowrap;
+}
+.chev {
+  color: var(--t-chev, #38bdf8);
+  transition: transform 0.15s;
+}
+.chevClosed {
+  transform: rotate(-90deg);
+}
+
+/* ---------- Sum row / add row ---------- */
+.sumTd {
+  height: calc(var(--t-sum-h, 28px) + var(--t-group-bw, 1px));
+  padding: 0 16px 0 0;
+  background: var(--t-sum-bg, #0f172a);
+  border-bottom: var(--t-group-bw, 1px) solid var(--t-group-border, #1e3a5f);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+.sumLabel {
+  color: var(--t-sum-label, #94a3b8);
+  font-weight: 600;
+}
+.addTd {
+  height: calc(var(--t-add-h, 34px) + var(--t-add-bw, 1px));
+  padding: 0 16px;
+  background: var(--t-add-bg, #0f172a);
+  border-bottom: var(--t-add-bw, 1px) solid var(--t-add-border, var(--t-group-border, #1e3a5f));
+}
+
+/* ---------- Footer strip ---------- */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--t-foot-h, 56px);
+  padding: 0 16px;
+  background: var(--t-foot-bg, #0f172a);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.footerInside {
+  border-top: 1px solid var(--t-foot-border, #1e3a5f);
+}
+.footerOutside {
+  margin-top: var(--t-foot-gap, 15px);
+  border-radius: 8px 8px 0 0;
+}
+
+.sumTd.tdFirst {
+  padding-left: 16px;
+}
+
+/* Alignment helpers come last so they win over the base cell padding. */
+.th.alignCenter,
+.td.alignCenter,
+.sumTd.alignCenter {
+  text-align: center;
+  padding-right: 0;
+}
+.th.alignRight,
+.td.alignRight,
+.sumTd.alignRight {
+  text-align: right;
+}

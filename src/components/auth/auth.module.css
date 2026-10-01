@@ -1,0 +1,83 @@
+.page {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--bg-page);
+}
+.card {
+  width: 460px;
+  max-width: 100%;
+  padding: 47px 48px 44px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 32px;
+}
+.logo {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+.brandName {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+}
+.subtitle {
+  margin-top: 11px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.heading {
+  margin-top: 28px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  color: #fff;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 21px;
+  margin-top: 19px;
+}
+.forgot {
+  align-self: flex-end;
+  margin-top: -10px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+.forgot:hover {
+  text-decoration: underline;
+}
+.submit {
+  margin-top: 10px;
+}
+.switch {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.switch a {
+  margin-left: 4px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+.switch a:hover {
+  text-decoration: underline;
+}
