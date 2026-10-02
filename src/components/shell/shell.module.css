@@ -12,6 +12,45 @@
   min-height: 0;
 }
 
+.routeLoading {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.routeLoadingBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36%;
+  height: 2px;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 236, 252, 0.5);
+  animation: route-progress 0.75s ease-in-out infinite alternate;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes route-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(280%);
+  }
+}
+
 /* ---------- Top header ---------- */
 .header {
   position: relative;
