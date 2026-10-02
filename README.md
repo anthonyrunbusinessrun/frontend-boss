@@ -1,6 +1,6 @@
 # BOSS Airtable — frontend
 
-High-fidelity Next.js (App Router) + React + TypeScript implementation of the **BOSS Airtable** designs.
+High-fidelity Next.js (App Router) + React + TypeScript implementation of the **BOSS Airtable** designs, backed by PostgreSQL.
 The designs are the source of truth; anything they do not specify is listed in
 [`NEEDS_CLARIFICATION.md`](./NEEDS_CLARIFICATION.md) rather than invented.
 
@@ -11,6 +11,8 @@ npm install
 npm run dev        # http://localhost:3000  (opens on /sign-in)
 npm run build && npm start
 npm run lint       # tsc --noEmit
+npm run db:migrate # create the PostgreSQL schema and seed an empty database
+npm run db:seed    # refresh the seed records explicitly
 ```
 
 Node 20+ recommended. Next 16, React 19, TypeScript, CSS Modules (no Tailwind), `lucide-react` icons,
@@ -37,17 +39,31 @@ src/
     view/         Workspace (sidebar + title + toolbar + table + footer), ViewToolbar
     popovers/     Popover + the eight cards (Sort, Hidden fields, Filter, Color, Share and sync, Share dialog, Group by, Profile menu)
   views/          one client component per screen: columns, theme, sidebar and toolbar config
-  services/       data access — the seam where a Node API plugs in
+  services/       server-side PostgreSQL data access (mock fallback without DATABASE_URL)
   data/           mock data transcribed from the screens
   types/          entity and RecordSet types
   lib/            sections, badge tones, helpers
 ```
 
-**Data flow:** `[section]/page.tsx` (server) → `services/*` → `<XView data=… />` (client) → `Workspace` → `DataTable`.
+**Data flow:** `[section]/page.tsx` (server) → `services/*` → PostgreSQL → `<XView data=… />` (client) → `Workspace` → `DataTable`.
 View definitions contain render functions, so they live in client components; only serialisable data crosses the boundary.
 
-**Connecting a backend:** replace the body of a function in `src/services/index.ts` with a `fetch` to the new endpoint.
-The `RecordSet<T>` return types are the contract the UI depends on.
+The backend stores Airtable-style records in `boss_sections`, `boss_groups`, and
+`boss_records`. This preserves each view's group metadata and lets the JSONB row
+payload evolve without a database migration every time an Airtable field changes.
+The `RecordSet<T>` return types remain the UI contract.
+
+## API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` | Database health check |
+| `GET /api/records/:section` | Read a complete grouped record set |
+| `POST /api/records/:section` | Create a row (`groupId` + `data`) |
+| `PATCH /api/records/:section/:id` | Update row fields |
+| `DELETE /api/records/:section/:id` | Delete a row |
+
+Mutations require `Authorization: Bearer $API_WRITE_TOKEN` in production.
 
 **Design fidelity rules followed:** Flexbox/Grid layout (no absolute positioning for layout), shared tokens in
 `globals.css`, per-screen table themes in each view, popovers close on Esc / outside press, controls that are not designed are inert.

@@ -19,6 +19,7 @@ import { TransactionsView } from "@/views/TransactionsView";
 import { VouchersView } from "@/views/VouchersView";
 
 export const dynamicParams = false;
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return SECTIONS.map((s) => ({ section: s.slug }));

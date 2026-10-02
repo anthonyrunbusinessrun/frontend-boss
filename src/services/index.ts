@@ -1,12 +1,10 @@
 /**
  * Service layer between the UI and data.
  *
- *   UI component -> service (this file) -> mock data  |  future Node.js API
+ *   UI component -> service (this file) -> PostgreSQL
  *
- * No backend endpoints have been specified, so each function resolves local mock
- * data. To connect a real API, replace the body of a function with a `fetch`
- * to the new endpoint; the return types (`RecordSet<T>`) are the contract the
- * UI depends on. NEEDS CLARIFICATION: API specification.
+ * During local design work without DATABASE_URL, the checked-in Airtable seed
+ * remains available as a fallback. Railway requests read from PostgreSQL.
  */
 import { accounts } from "@/data/accounts";
 import { actions } from "@/data/actions";
@@ -22,19 +20,26 @@ import { profiles } from "@/data/profiles";
 import { registries } from "@/data/registries";
 import { transactions } from "@/data/transactions";
 import { voucherLegend, vouchers } from "@/data/vouchers";
+import { db } from "@/lib/db";
+import { getRecordSet, type DataSection } from "@/server/records";
+import type { RecordSet } from "@/types";
 
-export const getProfiles = async () => profiles;
-export const getCategories = async () => categories;
-export const getFolios = async () => folios;
-export const getActions = async () => actions;
-export const getPacket = async () => packet;
-export const getVouchers = async () => vouchers;
+async function fromPostgres<T extends { id: string }>(section: DataSection, fallback: RecordSet<T>) {
+  return db ? getRecordSet<T>(section) : fallback;
+}
+
+export const getProfiles = async () => fromPostgres("profiles", profiles);
+export const getCategories = async () => fromPostgres("categories", categories);
+export const getFolios = async () => fromPostgres("folios", folios);
+export const getActions = async () => fromPostgres("actions", actions);
+export const getPacket = async () => fromPostgres("packet", packet);
+export const getVouchers = async () => fromPostgres("vouchers", vouchers);
 export const getVoucherLegend = async () => voucherLegend;
-export const getTransactions = async () => transactions;
-export const getItems = async () => items;
-export const getAccounts = async () => accounts;
-export const getForms = async () => forms;
-export const getConcepts = async () => concepts;
-export const getCapabilities = async () => capabilities;
-export const getLeads = async () => leads;
-export const getRegistries = async () => registries;
+export const getTransactions = async () => fromPostgres("transactions", transactions);
+export const getItems = async () => fromPostgres("items", items);
+export const getAccounts = async () => fromPostgres("accounts", accounts);
+export const getForms = async () => fromPostgres("forms", forms);
+export const getConcepts = async () => fromPostgres("concepts", concepts);
+export const getCapabilities = async () => fromPostgres("capabilities", capabilities);
+export const getLeads = async () => fromPostgres("leads", leads);
+export const getRegistries = async () => fromPostgres("registries", registries);
