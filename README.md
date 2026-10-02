@@ -15,6 +15,15 @@ npm run db:migrate # create the PostgreSQL schema and seed an empty database
 npm run db:seed    # refresh the seed records explicitly
 ```
 
+To import CSV exports from Airtable without committing them to Git:
+
+```bash
+AIRTABLE_CSV_DIR=/path/to/exports \
+AIRTABLE_IMPORT_URL=https://your-app.example.com \
+API_WRITE_TOKEN=your-railway-secret \
+python3 scripts/import-airtable.py
+```
+
 Node 20+ recommended. Next 16, React 19, TypeScript, CSS Modules (no Tailwind), `lucide-react` icons,
 Inter via `@fontsource-variable/inter`. No Vite.
 
@@ -53,6 +62,10 @@ The backend stores Airtable-style records in `boss_sections`, `boss_groups`, and
 payload evolve without a database migration every time an Airtable field changes.
 The `RecordSet<T>` return types remain the UI contract.
 
+Complete read-only Airtable exports are mirrored separately in `airtable_tables`
+and `airtable_records`. This preserves every CSV column as JSONB while keeping the
+typed frontend contract stable. Source CSVs are intentionally excluded from Git.
+
 ## API
 
 | Route | Purpose |
@@ -62,8 +75,12 @@ The `RecordSet<T>` return types remain the UI contract.
 | `POST /api/records/:section` | Create a row (`groupId` + `data`) |
 | `PATCH /api/records/:section/:id` | Update row fields |
 | `DELETE /api/records/:section/:id` | Delete a row |
+| `GET /api/airtable` | List imported Airtable tables |
+| `GET /api/airtable/:table` | Read a paginated raw table mirror |
+| `POST /api/airtable/:table` | Atomically replace a raw table mirror |
 
-Mutations require `Authorization: Bearer $API_WRITE_TOKEN` in production.
+Mutations and all raw Airtable mirror routes require
+`Authorization: Bearer $API_WRITE_TOKEN` in production.
 
 **Design fidelity rules followed:** Flexbox/Grid layout (no absolute positioning for layout), shared tokens in
 `globals.css`, per-screen table themes in each view, popovers close on Esc / outside press, controls that are not designed are inert.
