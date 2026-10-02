@@ -1,21 +1,24 @@
 import { Pool } from "pg";
 import { seedDatabase } from "./seed-data";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error("DATABASE_URL is required");
-  process.exit(1);
+async function main() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is required");
+
+  const pool = new Pool({
+    connectionString,
+    ssl: process.env.PGSSLMODE === "require" ? { rejectUnauthorized: false } : undefined,
+  });
+
+  try {
+    await seedDatabase(pool);
+    console.log("Database seed completed");
+  } finally {
+    await pool.end();
+  }
 }
 
-const pool = new Pool({
-  connectionString,
-  ssl: process.env.PGSSLMODE === "require" ? { rejectUnauthorized: false } : undefined,
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
 });
-
-try {
-  await seedDatabase(pool);
-  console.log("Database seed completed");
-} finally {
-  await pool.end();
-}
-
