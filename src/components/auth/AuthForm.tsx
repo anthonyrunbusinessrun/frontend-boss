@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
+import { useEffect, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { DEFAULT_SECTION } from "@/lib/sections";
@@ -17,6 +17,12 @@ import styles from "./auth.module.css";
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
   const isSignIn = mode === "sign-in";
+
+  // The workspace is the only destination after authentication. Warm that one
+  // route while the user fills the form instead of waiting after submission.
+  useEffect(() => {
+    router.prefetch(`/${DEFAULT_SECTION}`);
+  }, [router]);
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
