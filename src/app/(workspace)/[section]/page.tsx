@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 import { notFound } from "next/navigation";
 import shell from "@/components/shell/shell.module.css";
 import { isSectionSlug, SECTIONS } from "@/lib/sections";
@@ -7,20 +7,20 @@ import * as api from "@/services";
 
 // Each table is a sizeable client component. Loading it on demand keeps a
 // visit to one tab from downloading the renderers for every other tab.
-const AccountsView = dynamic(() => import("@/views/AccountsView").then((module) => module.AccountsView));
-const ActionsView = dynamic(() => import("@/views/ActionsView").then((module) => module.ActionsView));
-const CapabilitiesView = dynamic(() => import("@/views/CapabilitiesView").then((module) => module.CapabilitiesView));
-const CategoriesView = dynamic(() => import("@/views/CategoriesView").then((module) => module.CategoriesView));
-const ConceptsView = dynamic(() => import("@/views/ConceptsView").then((module) => module.ConceptsView));
-const FoliosView = dynamic(() => import("@/views/FoliosView").then((module) => module.FoliosView));
-const FormsView = dynamic(() => import("@/views/FormsView").then((module) => module.FormsView));
-const ItemsView = dynamic(() => import("@/views/ItemsView").then((module) => module.ItemsView));
-const LeadsView = dynamic(() => import("@/views/LeadsView").then((module) => module.LeadsView));
-const PacketView = dynamic(() => import("@/views/PacketView").then((module) => module.PacketView));
-const ProfilesView = dynamic(() => import("@/views/ProfilesView").then((module) => module.ProfilesView));
-const RegistriesView = dynamic(() => import("@/views/RegistriesView").then((module) => module.RegistriesView));
-const TransactionsView = dynamic(() => import("@/views/TransactionsView").then((module) => module.TransactionsView));
-const VouchersView = dynamic(() => import("@/views/VouchersView").then((module) => module.VouchersView));
+const AccountsView = dynamicImport(() => import("@/views/AccountsView").then((module) => module.AccountsView));
+const ActionsView = dynamicImport(() => import("@/views/ActionsView").then((module) => module.ActionsView));
+const CapabilitiesView = dynamicImport(() => import("@/views/CapabilitiesView").then((module) => module.CapabilitiesView));
+const CategoriesView = dynamicImport(() => import("@/views/CategoriesView").then((module) => module.CategoriesView));
+const ConceptsView = dynamicImport(() => import("@/views/ConceptsView").then((module) => module.ConceptsView));
+const FoliosView = dynamicImport(() => import("@/views/FoliosView").then((module) => module.FoliosView));
+const FormsView = dynamicImport(() => import("@/views/FormsView").then((module) => module.FormsView));
+const ItemsView = dynamicImport(() => import("@/views/ItemsView").then((module) => module.ItemsView));
+const LeadsView = dynamicImport(() => import("@/views/LeadsView").then((module) => module.LeadsView));
+const PacketView = dynamicImport(() => import("@/views/PacketView").then((module) => module.PacketView));
+const ProfilesView = dynamicImport(() => import("@/views/ProfilesView").then((module) => module.ProfilesView));
+const RegistriesView = dynamicImport(() => import("@/views/RegistriesView").then((module) => module.RegistriesView));
+const TransactionsView = dynamicImport(() => import("@/views/TransactionsView").then((module) => module.TransactionsView));
+const VouchersView = dynamicImport(() => import("@/views/VouchersView").then((module) => module.VouchersView));
 
 export const dynamicParams = false;
 export const dynamic = "force-dynamic";
