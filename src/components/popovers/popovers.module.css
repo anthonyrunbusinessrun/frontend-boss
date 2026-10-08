@@ -781,3 +781,88 @@
   font-size: 11px;
   font-weight: 600;
 }
+
+/* ---------- Functional additions (sort rules, filter value input) ---------- */
+.headerHint {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.sortRules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sortRule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: #fff;
+}
+.sortRuleName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dirBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--accent-cyan);
+  font-size: 12px;
+  font-weight: 600;
+}
+.dirBtn:hover {
+  background: rgba(0, 236, 252, 0.08);
+}
+.dirRemove {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+.dirRemove:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+.fieldItemOff {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.fieldItemOff:hover {
+  background: transparent;
+}
+.fieldEmpty {
+  padding: 16px 9px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.selectOpWide {
+  width: 130px;
+  flex: none;
+}
+.valueInput {
+  min-width: 0;
+  outline: none;
+}
+.valueInput:focus {
+  border-color: var(--accent-cyan);
+}
+.valueInput::placeholder {
+  color: var(--text-muted);
+}

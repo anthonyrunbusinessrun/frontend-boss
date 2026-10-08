@@ -28,3 +28,9 @@ export const DEFAULT_SECTION: SectionSlug = "profiles";
 export function isSectionSlug(value: string): value is SectionSlug {
   return SECTIONS.some((s) => s.slug === value);
 }
+
+/**
+ * Extra top-level modules that live outside the `[section]` route (they have their own
+ * route tree and sidebar). Rendered before the 15 BOSS tabs in the tab bar: AIS, BOSS, Profiles, …
+ */
+export const MODULE_TABS: ReadonlyArray<{ slug: string; label: string; href: string; badge?: string }> = [{ slug: "ais", label: "AIS", href: "/ais" }];

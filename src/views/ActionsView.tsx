@@ -3,7 +3,7 @@
 import { CircleCheck } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { RowActions } from "@/components/ui/RowActions";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -53,7 +53,17 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["Code", "Accrue", "Task Title", "Type", "Status", "Folio", "WK", "ACT", "QA"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("Code", "code", { form: form.text({ required: true }) }),
+  field("Accrue", "accrue", { form: form.text() }),
+  field("Task Title", "title", { form: form.text({ required: true, wide: true }) }),
+  field("Type", "type", { kind: "select", form: form.select(["Tasking", "Training", "Notice"], { required: true }) }),
+  field("Status", "status", { kind: "select", form: form.select(["Ongoing", "Queue", "Scheduled"], { required: true }) }),
+  field("Folio", "folio", { form: form.text() }),
+  field("WK", "wk", { form: form.text() }),
+  field("ACT", "act", { kind: "checkbox", form: form.check({ hint: "Mark when the action is complete." }) }),
+  field("QA", "qa", { kind: "checkbox", form: form.check({ hint: "Mark when QA has signed off." }) }),
+];
 
 const theme: TableTheme = {
   border: "#151f35",
@@ -103,6 +113,7 @@ export function ActionsView({ data }: { data: RecordSet<ActionRow> }) {
       title="BY FOLIO - HOT QA/NEXT"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "actions", singular: "action", plural: "actions", label: (r) => r.code, blank: () => ({ code: "", accrue: "", title: "", type: "Tasking", status: "Queue", folio: "", wk: "", act: false, qa: false }) }}
       toolbarTop={61.5}
       tableGap={21.5}
       data={data}

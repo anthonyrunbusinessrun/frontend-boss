@@ -1,0 +1,284 @@
+/* ---------- Toasts ---------- */
+.toastRegion {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 40px));
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.45;
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+}
+.toastIcon {
+  flex: none;
+  margin-top: 1px;
+}
+.toastSuccess .toastIcon {
+  color: var(--success);
+}
+.toastError {
+  border-color: rgba(207, 14, 56, 0.6);
+}
+.toastError .toastIcon {
+  color: #ff4d6a;
+}
+.toastInfo .toastIcon {
+  color: var(--accent-cyan);
+}
+.toastBody {
+  flex: 1;
+  min-width: 0;
+}
+.toastTitle {
+  display: block;
+  color: #fff;
+  font-weight: 600;
+}
+.toastAction {
+  margin-left: 8px;
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+.toastAction:hover {
+  text-decoration: underline;
+}
+.toastClose {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+.toastClose:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- Dialog layer (modal + drawer) ---------- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  background: rgba(2, 8, 20, 0.62);
+  animation: fade-in 0.15s ease-out;
+}
+.backdropConfirm {
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.backdropModal {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.backdropDrawer {
+  justify-content: flex-end;
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(100%, 860px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  color: var(--text-body);
+  outline: none;
+  animation: pop-in 0.16s ease-out;
+}
+.drawer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100vw;
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+  color: var(--text-body);
+  outline: none;
+  animation: slide-in 0.2s ease-out;
+}
+.dialogHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex: none;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dialogTitle {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+  color: #fff;
+}
+.dialogSub {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.dialogClose {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+.dialogClose:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+.dialogBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px 22px;
+}
+.dialogFoot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: none;
+  padding: 12px 20px;
+  background: var(--bg-input);
+  border-top: 1px solid var(--border-subtle);
+}
+.dialogFootStart {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.confirmText {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-body);
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-in {
+  from {
+    transform: translateX(32px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* ---------- Empty state ---------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 56px 24px;
+  text-align: center;
+}
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+.emptyText {
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.emptyAction {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* ---------- Skeleton ---------- */
+.skeletonBar {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #13233f 25%, #1b3254 50%, #13233f 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .backdropModal,
+  .backdropConfirm {
+    padding: 12px;
+  }
+}

@@ -1,0 +1,277 @@
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+.main {
+  flex: 999 1 560px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.side {
+  flex: 1 1 320px;
+  max-width: 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (max-width: 1180px) {
+  .side {
+    max-width: none;
+  }
+}
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.kpi {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 16px 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  text-align: left;
+}
+.kpiLink {
+  display: block;
+  cursor: pointer;
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.kpiLink:hover {
+  border-color: #2b4f7d;
+  background: #0d2444;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.kpiValue {
+  margin-top: 8px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.kpiNote {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.up {
+  color: var(--success);
+  font-weight: 600;
+}
+.down {
+  color: #ff4d6a;
+  font-weight: 600;
+}
+.neutral {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.panel {
+  padding: 18px 20px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.panelTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+.panelSub {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 12.5px;
+  color: var(--text-body);
+}
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+}
+.chart {
+  position: relative;
+  height: 230px;
+  margin-top: 38px;
+  border-bottom: 1px solid #2a4170;
+}
+.gridLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #16294a;
+}
+.gridLabel {
+  position: absolute;
+  left: 0;
+  transform: translateY(-120%);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.bars {
+  position: absolute;
+  inset: 0 0 0 36px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+}
+.group {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 100%;
+  padding: 0;
+  background: none;
+  border-radius: 4px;
+}
+.group:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.bar {
+  width: clamp(14px, 3vw, 32px);
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height 0.25s ease-out;
+}
+.barRev {
+  background: #2fc43f;
+}
+.barExp {
+  background: #d9112f;
+}
+.months {
+  display: flex;
+  justify-content: space-around;
+  margin: 8px 0 0 36px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.flowRows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+.flow {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 110px;
+  align-items: center;
+  gap: 14px;
+  font-size: 13.5px;
+}
+.track {
+  height: 9px;
+  border-radius: 5px;
+  background: #162a4d;
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.25s ease-out;
+}
+.flowAmount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #fff;
+}
+.attention {
+  display: flex;
+  flex-direction: column;
+}
+.attentionItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #1a2d52;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-cell);
+}
+.attentionDot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+}
+.attentionLink {
+  color: #ff6b84;
+  font-weight: 600;
+}
+.attentionLink:hover {
+  text-decoration: underline;
+}
+.countBadge {
+  min-width: 22px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: #f5b800;
+  color: #1a1400;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.health {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.tile {
+  flex: 1 1 130px;
+  min-width: 0;
+  padding: 12px 14px 14px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.tileLabel {
+  min-height: 26px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.tileValue {
+  margin-top: 6px;
+  font-size: 21px;
+  font-weight: 700;
+  color: #fff;
+}
+.tileNote {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}

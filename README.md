@@ -11,6 +11,7 @@ npm install
 npm run dev        # http://localhost:3000  (opens on /sign-in)
 npm run build && npm start
 npm run lint       # tsc --noEmit
+npm test           # unit tests: accounting logic, table state, record forms (node:test via tsx)
 npm run db:migrate # create the PostgreSQL schema and seed an empty database
 npm run db:seed    # refresh the seed records explicitly
 ```
@@ -35,6 +36,11 @@ Inter via `@fontsource-variable/inter`. No Vite.
 | `/profiles` … `/registries` | The 14 workspace tabs, one per `Screens/` image |
 | `/boss` | Marked placeholder (no design supplied) |
 | `/dev/cards` | Dev-only gallery of the 8 card/modal designs (404 in production) |
+| `/ais` | Accounting Information System (AIS) dashboard: the first tab of the tab bar (AIS, BOSS, Profiles, …) |
+| `/ais/accounts`, `/ais/general-ledger`, `/ais/journal-entries` | Chart of accounts, general ledger, journal entries |
+| `/ais/customers`, `/ais/invoices`, `/ais/accounts-receivable`, `/ais/payments` | Sales & receivables |
+| `/ais/vendors`, `/ais/bills`, `/ais/accounts-payable` | Purchases & payables |
+| `/ais/reports`, `/ais/settings` | Income statement, balance sheet, trial balance, aging; company / fiscal-year / numbering settings |
 
 ## Architecture
 
@@ -53,6 +59,32 @@ src/
   types/          entity and RecordSet types
   lib/            sections, badge tones, helpers
 ```
+
+### Making the tables work
+
+Every BOSS tab goes through the same `Workspace` + `DataTable`, so behaviour is implemented once:
+
+- **Search** – the header box filters the table of the current screen (`shell/SearchContext`); it clears when you change screen.
+- **Sort / Filter / Hide fields** – the toolbar cards are controlled by `Workspace`. Each view declares its fields once (`FieldDef` in `popovers/fields.tsx`: `key`, `column`, `type`, `form`); the same declaration drives sorting, filtering, column visibility and the record form. A field without a `key` is shown in the cards as designed but cannot be evaluated. The pure logic is in `table/tableState.ts`.
+- **Pagination, selection, empty / loading states** – real; the footer counts what is actually in the table.
+- **Records** – row click opens a drawer (view -> edit), `Create new …` / `Add row` open the create form, row icons edit / duplicate / delete (delete always asks, and offers Undo). Forms are generated from the view's `FieldDef`s (`records/RecordDrawer`).
+- **Persistence** – edits are stored as a small overlay in `localStorage` (`services/localRecords.ts`) on top of the server data. Writing through the existing `/api/records` routes instead only requires changing that file (those routes require a bearer token in production, so the browser cannot call them yet).
+
+### Accounting Information System (AIS)
+
+```
+src/app/(workspace)/ais/        routes + layout (AIS sidebar, books provider, record drawers)
+src/components/ais/             pages/ (one screen each), drawers/ (view / create / edit), AisList, AisPage, cells
+src/services/ais/               ledger.ts (posting, balances), validation.ts, mutations.ts (state transitions),
+                                reports.ts (statements, aging, dashboard), repository.ts (storage boundary)
+src/data/ais/seed.ts            one consistent set of sample books (Ray Land, Inc., Apr-Sep 2026)
+src/types/ais.ts                domain model (all amounts are integer cents)
+```
+
+- **One source of truth:** invoices, bills and payments post journal entries through the same functions the UI uses, so the ledger, receivables, payables, reports and dashboard always agree. Reports and dashboard figures are derived from posted journal lines.
+- **Journal entries** must balance (total debits = total credits, exact cents) to be saved as a draft or posted. Posted entries are read-only and can be reversed.
+- **Storage boundary:** components call `AisProvider`, which calls pure functions in `mutations.ts` and persists through `AisRepository` (`load` / `save` / `reset`). The browser implementation is in `repository.ts`; an API implementation replaces it without touching the UI or the accounting logic.
+- **Reporting date:** the books carry a reporting date (30 Sep 2026 in the sample data, editable in Settings). Aging, overdue flags and "This month" are measured from it.
 
 **Data flow:** `[section]/page.tsx` (server) → `services/*` → PostgreSQL → `<XView data=… />` (client) → `Workspace` → `DataTable`.
 View definitions contain render functions, so they live in client components; only serialisable data crosses the boundary.
@@ -83,9 +115,12 @@ Mutations and all raw Airtable mirror routes require
 `Authorization: Bearer $API_WRITE_TOKEN` in production.
 
 **Design fidelity rules followed:** Flexbox/Grid layout (no absolute positioning for layout), shared tokens in
-`globals.css`, per-screen table themes in each view, popovers close on Esc / outside press, controls that are not designed are inert.
+`globals.css`, per-screen table themes in each view, popovers close on Esc / outside press. Controls whose behaviour is still not designed (see `NEEDS_CLARIFICATION.md`) stay inert or say so.
 
 ## QA
+
+`npm test` runs the unit tests (accounting logic, table state, record forms). `qa/e2e-browser.mjs` is a browser
+end-to-end script for the interactions and the AIS flows (see its header for how to run it).
 
 `qa/` contains the Playwright scripts used to verify the build (Python, Playwright, Pillow, numpy):
 

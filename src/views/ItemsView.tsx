@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
 import { Workspace } from "@/components/view/Workspace";
 import type { ItemRow, RecordSet } from "@/types";
+import { Dash } from "./cells";
 import styles from "./views.module.css";
 
 const sidebar: SidebarConfig = {
@@ -49,7 +50,17 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["N.", "Pic", "Title", "Overview", "Purstat", "Location", "Qty", "Kit", "Assigned"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("N.", "n", { type: "number" }),
+  field("Pic", "pic"),
+  field("Title", "title", { form: form.text({ required: true }) }),
+  field("Overview", "overview", { form: form.text({ wide: true }) }),
+  field("Purstat", "purstat", { kind: "select", form: form.select(["Purchased"], { required: true }) }),
+  field("Location", "location", { form: form.text() }),
+  field("Qty", "qty", { type: "number", form: form.number({ min: 0, required: true }) }),
+  field("Kit", "kit", { kind: "select", form: form.select(["Kit Alpha", "Kit Beta", "Kit Gamma", "Kit Delta"], { required: true }) }),
+  field("Assigned", "assigned", { form: form.text() }),
+];
 
 const theme: TableTheme = {
   border: "#141e35",
@@ -71,7 +82,7 @@ const columns: Column<ItemRow>[] = [
     header: "Pic",
     width: 52,
     padLeft: 0,
-    render: (r) => <Image src={r.pic} alt="" width={40} height={40} className={styles.thumb} />,
+    render: (r) => (r.pic ? <Image src={r.pic} alt="" width={40} height={40} className={styles.thumb} /> : <Dash />),
   },
   { key: "title", header: "Title", width: 212, padLeft: 0, render: (r) => <span className={`${styles.cIce} ${styles.b6}`}>{r.title}</span> },
   { key: "overview", header: "Overview", width: 232, padLeft: 0, padRight: 6, render: (r) => <span className={styles.cInk}>{r.overview}</span> },
@@ -94,6 +105,7 @@ export function ItemsView({ data }: { data: RecordSet<ItemRow> }) {
       titleAside={<Badge tone="countRed" shape="total">Total: 10 Items Listed</Badge>}
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "items", singular: "item", plural: "items", label: (r) => r.title, blank: (rows) => ({ n: rows.reduce((max, r) => Math.max(max, r.n), 0) + 1, pic: "", title: "", overview: "", purstat: "Purchased", location: "", qty: 0, kit: "Kit Alpha", assigned: "" }) }}
       toolbarTop={92.5}
       tableGap={21.5}
       data={data}

@@ -55,6 +55,14 @@ export const TONES = {
   // Registries
   comingDue: { bg: "#3d2b1e", fg: "#f59e0b" },
   current: { bg: "#1b3b2b", fg: "#52d18d" },
+  // Accounting document statuses
+  statusPaid: { bg: "#064030", fg: "#2ecc8e" },
+  statusOpen: { bg: "#0c3a50", fg: "#67e8f9" },
+  statusPartial: { bg: "#162040", fg: "#60a5fa" },
+  statusOverdue: { bg: "rgba(207, 14, 56, 0.22)", fg: "#ff4d6a" },
+  statusDraft: { bg: "#1e293b", fg: "#94a3b8" },
+  statusVoid: { bg: "#1e293b", fg: "#64748b" },
+  statusAwaiting: { bg: "#3b2000", fg: "#fcd34d" },
   // Billing text on near-transparent pill
   billing: { bg: "rgba(255, 255, 255, 0.03)", fg: "#cf0e38" },
 } as const satisfies Record<string, Tone>;

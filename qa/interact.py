@@ -37,10 +37,11 @@ with sync_playwright() as p:
     sb.get_by_role("button",name="My Favorites").click(); check("section expands", sb.get_by_text("Bookmarks").is_visible())
     sb.get_by_label("Find a view").fill("team"); check("find-a-view filters", sb.get_by_text("Team Profiles").is_visible() and sb.get_by_text("Archive").count()==0)
     sb.get_by_label("Find a view").fill("")
-    # ---- pagination (profiles footer)
+    # ---- pagination (profiles footer). The footer reflects the real rows: 12 rows fit on one page of 25.
     pager=pg.get_by_label("Pagination")
-    pager.get_by_role("button",name="2",exact=True).click(); check("pagination page 2 becomes current", pager.get_by_role("button",name="2",exact=True).get_attribute("aria-current")=="page")
-    pager.get_by_label("Previous page").click(); check("previous page works", pager.get_by_role("button",name="1",exact=True).get_attribute("aria-current")=="page")
+    check("footer counts the real rows", pg.get_by_text("Showing 1-12 of 12 records").is_visible())
+    check("single page is current", pager.get_by_role("button",name="1",exact=True).get_attribute("aria-current")=="page")
+    check("previous / next are disabled on a single page", pager.get_by_label("Previous page").is_disabled() and pager.get_by_label("Next page").is_disabled())
     # ---- popovers on profiles
     chips=[("57 hidden fields","Hide fields"),("Filtered by Team, Inactive","Filter"),("Grouped by 1 field","Group by"),("Sort","Sort"),("Color","Color"),("Share and sync","Share and sync")]
     for chip,label in chips:

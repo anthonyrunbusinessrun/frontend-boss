@@ -1,6 +1,6 @@
 "use client";
 
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -28,7 +28,16 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["Folio", "Cord", "Inactive", "Group", "Category", "Active", "ASFS", "Actions"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("Folio", "folio", { form: form.text({ required: true }) }),
+  field("Cord", "cord", { form: form.text({ nullable: true }) }),
+  field("Inactive", "inactive", { form: form.text({ nullable: true }) }),
+  field("Group", "group", { form: form.text({ nullable: true }) }),
+  field("Category", "category", { form: form.text({ nullable: true }) }),
+  field("Active", "active", { type: "number", form: form.number({ nullable: true, min: 0 }) }),
+  field("ASFS", "asfs", { type: "number", form: form.number({ nullable: true, min: 0 }) }),
+  field("Actions", "actions", { form: form.text({ nullable: true }) }),
+];
 
 const theme: TableTheme = {
   border: "#1a2d50",
@@ -72,6 +81,7 @@ export function FoliosView({ data }: { data: RecordSet<FolioRow> }) {
       title="Folios - All Active Categories"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "folios", singular: "folio", plural: "folios", label: (r) => r.folio, blank: () => ({ folio: "", cord: null, inactive: null, group: null, category: null, active: null, asfs: null, actions: null }) }}
       toolbarTop={69.5}
       tableGap={21.5}
       data={data}

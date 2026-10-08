@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
 import { Workspace } from "@/components/view/Workspace";
 import type { CapabilityRow, RecordSet } from "@/types";
-import { GroupLabel } from "./cells";
+import { Dash, GroupLabel } from "./cells";
 import styles from "./views.module.css";
 
 const sidebar: SidebarConfig = {
@@ -29,7 +29,16 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["Code", "Title", "Brief Overview", "Gallery", "Notes", "Attachments", "Key Features", "Tagline"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("Code", "code", { form: form.text({ required: true }) }),
+  field("Title", "title", { form: form.text({ required: true }) }),
+  field("Brief Overview", "overview", { form: form.area() }),
+  field("Gallery", "gallery"),
+  field("Notes", "notes", { form: form.area() }),
+  field("Attachments", "attachment", { form: form.text({ hint: "File name, e.g. SOP-Meals-V4.pdf" }) }),
+  field("Key Features", "features", { kind: "multi", type: "list", form: form.list({ placeholder: "Separate features with commas" }) }),
+  field("Tagline", "tagline", { form: form.text({ wide: true }) }),
+];
 
 const theme: TableTheme = {
   border: "#0b1f3a",
@@ -57,7 +66,7 @@ const columns: Column<CapabilityRow>[] = [
     header: "Gallery",
     width: 82,
     padLeft: 0,
-    render: (r) => <Image src={r.gallery} alt="" width={48} height={28} className={styles.thumb} style={{ borderRadius: 4, width: 48, height: 28 }} />,
+    render: (r) => (r.gallery ? <Image src={r.gallery} alt="" width={48} height={28} className={styles.thumb} style={{ borderRadius: 4, width: 48, height: 28 }} /> : <Dash />),
   },
   { key: "notes", header: "Notes", width: 152, padLeft: 0, render: (r) => <span className={styles.dimBlue}>{r.notes}</span> },
   { key: "attachment", header: "Attachments", width: 132, padLeft: 0, render: (r) => <Badge tone="chip" shape="mini">{r.attachment}</Badge> },
@@ -87,6 +96,7 @@ export function CapabilitiesView({ data }: { data: RecordSet<CapabilityRow> }) {
       title="All Capabilities View"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "capabilities", singular: "capability", plural: "capabilities", label: (r) => r.title, blank: () => ({ code: "", title: "", overview: "", gallery: "", notes: "", attachment: "", features: [], tagline: "" }) }}
       toolbarTop={61.5}
       tableGap={21.5}
       data={data}

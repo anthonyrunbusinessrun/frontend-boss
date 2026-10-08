@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/Badge";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -19,7 +19,18 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["#", "Code", "Type", "Slug", "Style", "Form Title", "Long Title", "Group", "Description", "Actions"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  { name: "#", kind: "text" },
+  field("Code", "code", { form: form.text({ required: true }) }),
+  field("Type", "type", { form: form.text() }),
+  field("Slug", "slug", { form: form.text() }),
+  field("Style", "style", { kind: "select", form: form.select(["Work"], { required: true }) }),
+  field("Form Title", "title", { form: form.text({ required: true }) }),
+  field("Long Title", "longTitle", { form: form.text({ wide: true }) }),
+  field("Group", "group", { kind: "select", form: form.select(["Buy", "Blanket"], { required: true }) }),
+  field("Description", "description", { form: form.area() }),
+  { name: "Actions", kind: "text" },
+];
 
 const theme: TableTheme = {
   border: "#0b1f3a",
@@ -61,6 +72,7 @@ export function FormsView({ data }: { data: RecordSet<FormRow> }) {
       title="WSF General Forms"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "forms", singular: "form", plural: "forms", label: (r) => r.title, blank: () => ({ code: "", type: "", slug: "", style: "Work", title: "", longTitle: "", group: "Buy", description: "" }) }}
       toolbarTop={65.5}
       tableGap={21.5}
       data={data}

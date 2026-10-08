@@ -50,6 +50,16 @@
   height: 46px;
   font-size: 14px;
 }
+.sizeMd {
+  height: 34px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+.sizeSm {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12px;
+}
 
 /* ---------- Badge ---------- */
 .badge {

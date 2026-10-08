@@ -3,7 +3,7 @@
 import { Plus } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { RowActions } from "@/components/ui/RowActions";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -30,7 +30,17 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["#", "Full Title", "Release", "Acronym", "Type", "Definition", "Related", "Link", "Work"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  { name: "#", kind: "text" },
+  field("Full Title", "title", { form: form.text({ required: true, wide: true }) }),
+  field("Release", "release", { form: form.text({ nullable: true }) }),
+  field("Acronym", "acronym", { form: form.text({ nullable: true }) }),
+  field("Type", "type", { kind: "select", form: form.select(["Course"], { required: true }) }),
+  field("Definition", "definition", { form: form.area({ nullable: true }) }),
+  field("Related", "related", { form: form.text({ nullable: true }) }),
+  field("Link", "link", { form: form.text() }),
+  field("Work", "work", { kind: "multi", type: "list", form: form.list() }),
+];
 
 const theme: TableTheme = {
   border: "#0b1f3a",
@@ -87,6 +97,7 @@ export function ConceptsView({ data }: { data: RecordSet<ConceptRow> }) {
       title="Folio Concepts Value List"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "concepts", singular: "concept", plural: "concepts", label: (r) => r.title, blank: () => ({ title: "", release: null, acronym: null, type: "Course", definition: null, related: null, link: "", work: [] }) }}
       toolbarTop={61.5}
       tableGap={21.5}
       data={data}

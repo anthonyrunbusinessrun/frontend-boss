@@ -1,13 +1,13 @@
 "use client";
 
 import { CornerDownRight, CircleHelp, FolderClosed, KeyRound, Link2, Tag, Type } from "lucide-react";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
 import { Workspace } from "@/components/view/Workspace";
 import type { PacketRow, RecordSet } from "@/types";
-import { GroupLabel, orDash } from "./cells";
+import { GroupLabel } from "./cells";
 import styles from "./views.module.css";
 
 const sidebar: SidebarConfig = {
@@ -25,7 +25,15 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["Title", "Folder", "Record ID", "Folio", "URL", "Is Folder", "Parent Folder"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("Title", "title", { form: form.text({ required: true }) }),
+  field("Folder", "folder", { form: form.text({ nullable: true }) }),
+  field("Record ID", "recordId", { form: form.text({ required: true }) }),
+  field("Folio", "folio", { form: form.text() }),
+  field("URL", "url", { form: form.url({ nullable: true, wide: true }) }),
+  field("Is Folder", "isFolder", { kind: "checkbox", form: form.check() }),
+  field("Parent Folder", "parentFolder", { column: "parent", form: form.text({ nullable: true }) }),
+];
 
 const theme: TableTheme = {
   border: "#0b1f3a",
@@ -78,6 +86,7 @@ export function PacketView({ data }: { data: RecordSet<PacketRow> }) {
       title="SYSTEM"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "packet", singular: "packet item", plural: "packet items", label: (r) => r.title, blank: () => ({ title: "", folder: null, recordId: "", folio: "", url: null, isFolder: false, parentFolder: null }) }}
       toolbarTop={58.5}
       tableGap={18.5}
       data={data}

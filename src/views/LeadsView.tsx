@@ -3,7 +3,7 @@
 import { Paperclip } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { RowActions } from "@/components/ui/RowActions";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -49,7 +49,16 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["ID", "Client", "Full Title", "Type", "Due (Local)", "Files", "Notice URL", "Actions"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("ID", "leadId", { column: "id", form: form.text({ required: true, placeholder: "e.g. L-4097" }) }),
+  field("Client", "client", { form: form.text({ required: true }) }),
+  field("Full Title", "title", { form: form.text({ required: true, wide: true }) }),
+  field("Type", "type", { kind: "select", form: form.select(["Solicitation", "Sources Sought", "Combined Syn/Solicitation", "Request for Information"], { required: true }) }),
+  field("Due (Local)", "due", { column: "due", form: form.text({ placeholder: "MM/DD/YYYY" }) }),
+  field("Files", "hasFiles", { column: "files", kind: "checkbox", form: form.check({ hint: "Attachments were provided with the notice." }) }),
+  field("Notice URL", "url", { column: "url", form: form.text({ wide: true }) }),
+  { name: "Actions", kind: "text" },
+];
 
 const theme: TableTheme = {
   border: "#0d1830",
@@ -97,6 +106,7 @@ export function LeadsView({ data }: { data: RecordSet<LeadRow> }) {
       title="Grid View"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "leads", singular: "lead", plural: "leads", label: (r) => r.leadId, blank: () => ({ leadId: "", client: "", title: "", type: "Solicitation", due: "", hasFiles: false, url: "" }) }}
       toolbarTop={61.5}
       tableGap={21.5}
       data={data}

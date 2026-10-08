@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/Badge";
 import { RowActions } from "@/components/ui/RowActions";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -29,10 +29,10 @@ const sidebar: SidebarConfig = {
 };
 
 const fields: FieldDef[] = [
-  { name: "Value Code/Title", kind: "text" },
-  { name: "Group", kind: "text" },
-  { name: "Level Two Value", kind: "text" },
-  { name: "Folios", kind: "multi" },
+  field("Value Code/Title", "code", { form: form.text({ required: true }) }),
+  field("Group", "group", { form: form.text({ required: true }) }),
+  field("Level Two Value", "levelTwo", { form: form.text({ nullable: true }) }),
+  field("Folios", "folios", { kind: "multi", type: "list", form: form.list({ placeholder: "Separate folios with commas" }) }),
 ];
 
 const theme: TableTheme = {
@@ -82,6 +82,7 @@ export function CategoriesView({ data }: { data: RecordSet<CategoryRow> }) {
       title="Folio Category Value List"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "categories", singular: "category", plural: "categories", label: (r) => r.code, blank: () => ({ code: "", group: "", levelTwo: null, folios: [] }) }}
       toolbarTop={72.5}
       tableGap={20.5}
       data={data}

@@ -13,18 +13,18 @@ next to the code it affects.
 | **Landing page after sign-in / sign-up** | Assumed `/profiles` (`DEFAULT_SECTION` in `src/lib/sections.ts`). |
 | **Auth** | No backend, validation, error states or session. Submitting only navigates. There is **no auth guard** on workspace routes. |
 | **Sign-in values** | The design shows the email and an 8-dot password pre-filled. These are mock `defaultValue`s. |
-| **Global search** | Field is presentational; results are not designed. |
-| **"Create new …" buttons** | Rendered with the designed label; no creation flow is designed (inert). |
-| **Row actions** (edit / duplicate / delete) | Icons rendered; no form, duplicate result or delete confirmation is designed (inert). |
-| **"Add row"** | Rendered; row-creation UI not designed (inert). |
-| **Sidebar views other than the active one** | Only the active view of each screen is designed. Other entries are presentational. Collapse and "Find a view…" filtering do work. |
-| **Pagination page 2** | Page state changes, but page 2 content is not designed so the table does not change. |
+| **Global search** | Filters the table of the current screen. Cross-screen results (the placeholder mentions profiles, transactions and categories) are not designed. |
+| **"Create new …" buttons** | Open a generated new-record drawer. The form layout is not designed: fields come from each view's `FieldDef`s. |
+| **Row actions** (edit / duplicate / delete) | Work through the same drawer. Duplicate opens a pre-filled new record; delete asks for confirmation and offers Undo. Edits are kept in `localStorage`, not the database. |
+| **"Add row"** | Opens the new-record drawer with the group preselected. |
+| **Sidebar views other than the active one** | Only the active view of each screen is designed. Clicking another shows a toast that the saved view is not connected. Collapse and "Find a view…" filtering work. |
+| **Pagination** | Real (25 rows per page). Footer counts are the actual row counts, so they no longer reproduce the design's fixed figures (e.g. Profiles reads "of 12", not "of 14"). The pagination check in `qa/interact.py` was updated to match, but Playwright was not available where this was built, so that script has not been re-run. |
 | **Share dialog** (`Share "BOSS"`) | No control anywhere opens it. It exists only in the dev gallery (`/dev/cards`). Its "Share to web" tab is not designed. |
 | **Share and sync actions** | "Create link", "Sync data", "Embed", "Create a form view", "Go to interfaces" and "Learn more" have no destinations. "Dismiss" works. |
 | **Color card** | Only step 1 (choose "Select field" / "Conditions") is designed. |
-| **Filter card** | AI prompt, "Add condition group", "Copy from another view" and the join/field lists beyond the checkbox fields are not designed. Add/delete/toggle conditions work locally and do not filter the table. |
+| **Filter card** | Conditions now filter the table (operators by field type). AI prompt, "Add condition group" and "Copy from another view" are still not designed and do nothing. The design's initial Profiles conditions (Team, Inactive) are shown but have no data field to evaluate. |
 | **Group card** | "Add subgroup", direction and remove-group controls are not designed. "Collapse all" / "Expand all" work on the table. |
-| **Sort / Hide fields** | Field lists scroll beyond the visible rows in the design. Hide-field toggles work locally but do not change table columns or the "57 hidden fields" label. Reordering (drag handle) is not designed. |
+| **Sort / Hide fields** | Sorting by a field and hiding a column work. Fields drawn in the cards that have no column or data in the view (e.g. most of the 57 hidden Profiles fields) cannot be sorted or hidden. Hiding a field adds to the "N hidden fields" count. Reordering (drag handle) is not designed. |
 
 ## 2. Contradictions and slips in the designs
 
@@ -49,3 +49,19 @@ next to the code it affects.
 - Mock data is served through `src/services`. No API contract exists; the `RecordSet<T>` types are the proposed contract.
 - Fonts: Inter (variable) via `@fontsource-variable/inter`, self-hosted.
 - Minimum supported width is 960px (the designs are 1440px only). No tablet or mobile layouts were designed.
+
+## 5. Accounting Information System (AIS)
+
+The AIS follows the layout agreed in the combined BOSS + AIS design. What the design did not settle:
+
+| Area | What the app does today |
+| --- | --- |
+| **Navigation entries not built** | The AIS design also lists Estimates, Credit Notes, Expenses, Banking, Inventory, Projects and Budgeting. They were not part of the requested workflows, so no pages or placeholder routes exist. `components/ais/nav.ts` is the single place to add them. |
+| **Budget tile / alert** | The design's "Budget Utilization" tile and "Marketing over budget" alert depend on Budgeting. The tile is replaced by "Avg days to collect"; the alert is not produced. |
+| **Dashboard figures** | Calculated from the sample books, so they differ from the figures in the design mock. The Weekly / Quarterly / Yearly chart toggles are not implemented (the chart shows the last 6 months). |
+| **Reporting date** | Fixed at 30 Sep 2026 in the sample data (Settings). "This month", aging and overdue flags use it instead of today's date. |
+| **Customers / vendors and BOSS profiles** | Linked only by an optional "BOSS account owner" field holding a profile contact code (e.g. `EJH`). Nothing reads the BOSS profile data yet. |
+| **Persistence** | The books are stored in the browser (`localStorage`). There is no multi-user access, audit trail or period closing; posted entries are read-only and corrected by reversal. |
+| **Payments** | Recorded payments cannot be edited, only deleted and re-entered. |
+| **Export** | Lists and reports export CSV. PDF / print layouts are not built. |
+| **Tax, multi-currency, attachments** | Not in the design; not implemented. |

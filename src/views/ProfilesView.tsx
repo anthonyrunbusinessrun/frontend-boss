@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/Badge";
+import { DESIGN_FILTER } from "@/components/popovers/FilterCard";
 import { PROFILE_FIELDS } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
@@ -78,10 +79,11 @@ export function ProfilesView({ data }: { data: RecordSet<Profile> }) {
       title="Active Profiles"
       toolbar={{
         hide: { label: "57 hidden fields", active: true },
-        filter: { label: "Filtered by Team, Inactive" },
+        filter: { label: "Filtered by Team, Inactive", initial: DESIGN_FILTER },
         group: { label: "Grouped by 1 field" },
       }}
       fields={PROFILE_FIELDS}
+      records={{ section: "profiles", singular: "profile", plural: "profiles", label: (r) => r.name, blank: () => ({ contact: "", sal: null, name: "", position: "", billing: null, type: "Agent", email: "", address: null }) }}
       toolbarInsetRight={33}
       toolbarTop={62}
       tableGap={16}

@@ -1,7 +1,7 @@
 "use client";
 
 import { RowActions } from "@/components/ui/RowActions";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -35,7 +35,19 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["#", "Acct Code", "Title", "Acct Type", "Def", "Stmt", "Debits", "Credits", "Balance", "Transactions", "Frequent"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  { name: "#", kind: "text" },
+  field("Acct Code", "code", { form: form.text({ required: true }) }),
+  field("Title", "title", { form: form.text({ required: true }) }),
+  field("Acct Type", "type", { form: form.select(["Asset", "Liability", "Equity", "Revenue", "Expense"], { required: true }) }),
+  field("Def", "def", { form: form.select(["Debit", "Credit"], { required: true }) }),
+  field("Stmt", "stmt", { form: form.select(["Income Statement", "Balance Sheet"], { required: true }) }),
+  field("Debits", "debits", { type: "number", form: form.number({ min: 0 }) }),
+  field("Credits", "credits", { type: "number", form: form.number({ min: 0 }) }),
+  field("Balance", "balance", { type: "number", form: form.number() }),
+  field("Transactions", "transactions", { type: "number", form: form.number({ min: 0 }) }),
+  field("Frequent", "frequent", { kind: "select", form: form.select(["Yes", "No"], { required: true }) }),
+];
 
 const theme: TableTheme = {
   border: "#1e3a6e",
@@ -78,6 +90,7 @@ export function AccountsView({ data }: { data: RecordSet<AccountRow> }) {
       title="All Accounts View"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "accounts", singular: "account", plural: "accounts", label: (r) => r.title, blank: () => ({ code: "", title: "", type: "Asset", def: "Debit", stmt: "Balance Sheet", debits: 0, credits: 0, balance: 0, transactions: 0, frequent: "No" }) }}
       toolbarTop={65.5}
       tableGap={21.5}
       data={data}

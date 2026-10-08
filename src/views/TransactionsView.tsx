@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/Badge";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
@@ -34,7 +34,20 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["Trans #", "Voucher", "Cust Ref", "Accrue", "Acct", "Item", "Memo", "DR Qty", "CR Qty", "Qty", "Direct", "Voucher Detail"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("Trans #", "trans", { form: form.text({ required: true }) }),
+  field("Voucher", "voucher", { form: form.text() }),
+  field("Cust Ref", "custRef", { form: form.text() }),
+  field("Accrue", "accrue", { type: "date", form: { input: "date" } }),
+  field("Acct", "acct", { kind: "select", form: form.select(["COGS", "SALES"], { required: true }) }),
+  field("Item", "item", { form: form.text() }),
+  field("Memo", "memo", { form: form.text({ wide: true }) }),
+  field("DR Qty", "drQty", { type: "number", form: form.number({ min: 0 }) }),
+  field("CR Qty", "crQty", { type: "number", form: form.number({ min: 0 }) }),
+  field("Qty", "qty", { type: "number", form: form.number() }),
+  field("Direct", "direct", { kind: "select", form: form.select(["Yes", "No"], { required: true }) }),
+  field("Voucher Detail", "detail", { form: form.text({ wide: true }) }),
+];
 
 const theme: TableTheme = {
   border: "#374151",
@@ -93,6 +106,7 @@ export function TransactionsView({ data }: { data: RecordSet<TransactionRow> }) 
       titleAside={<Badge tone="countRed" shape="total">Total: 10 Items Listed</Badge>}
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "transactions", singular: "transaction", plural: "transactions", label: (r) => r.trans, blank: () => ({ trans: "", voucher: "", custRef: "", accrue: "", acct: "SALES", item: "", memo: "", drQty: 0, crQty: 0, qty: 0, direct: "No", detail: "" }) }}
       toolbarTop={84.5}
       tableGap={21.5}
       data={data}

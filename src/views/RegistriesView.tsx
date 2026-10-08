@@ -3,12 +3,13 @@
 import { AlignLeft, CalendarDays, FileText, Paperclip, Table2 } from "lucide-react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
 import { Workspace } from "@/components/view/Workspace";
 import type { RecordSet, RegistryRow } from "@/types";
+import { Dash } from "./cells";
 import styles from "./views.module.css";
 
 const sidebar: SidebarConfig = {
@@ -27,7 +28,13 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["Name", "Attachments", "Status", "Expiry", "Notes"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("Name", "name", { form: form.text({ required: true, wide: true }) }),
+  field("Attachments", "attachment"),
+  field("Status", "status", { kind: "select", form: form.select(["Coming Due", "Current"], { required: true }) }),
+  field("Expiry", "expiry", { type: "date", form: { input: "date", required: true } }),
+  field("Notes", "notes", { form: form.area({ nullable: true }) }),
+];
 
 const theme: TableTheme = {
   border: "#0b132b",
@@ -59,7 +66,7 @@ const columns: Column<RegistryRow>[] = [
     width: 162,
     padLeft: 25,
     headPadLeft: 14,
-    render: (r) => <Image src={r.attachment} alt="" width={110} height={76} className={styles.thumb} style={{ width: 110, height: 76, borderRadius: 4 }} />,
+    render: (r) => (r.attachment ? <Image src={r.attachment} alt="" width={110} height={76} className={styles.thumb} style={{ width: 110, height: 76, borderRadius: 4 }} /> : <Dash />),
   },
   {
     key: "status",
@@ -79,6 +86,7 @@ export function RegistriesView({ data }: { data: RecordSet<RegistryRow> }) {
       title="Grid view"
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "registries", singular: "registry", plural: "registries", label: (r) => r.name, blank: () => ({ name: "", attachment: "", status: "Current", expiry: "", notes: null }) }}
       toolbarTop={71.5}
       tableGap={21.5}
       data={data}

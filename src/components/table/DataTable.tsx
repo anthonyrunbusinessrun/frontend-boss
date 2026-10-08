@@ -1,11 +1,13 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
-import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ChevronDown } from "lucide-react";
+import { Fragment, useMemo, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { AddRowButton } from "@/components/ui/AddRowButton";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { SkeletonBar } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/cn";
 import type { RecordGroup } from "@/types";
+import { useRecordActions, RowContext } from "./RecordContext";
 import styles from "./table.module.css";
 import { themeToStyle, type TableTheme } from "./theme";
 
@@ -64,7 +66,25 @@ export interface DataTableProps<T> {
   footer?: ReactNode;
   /** Fixed horizontal scroll width override (tables wider than the viewport). */
   className?: string;
+  /** Column keys hidden through the "Hide fields" card. */
+  hiddenColumns?: ReadonlySet<string>;
+  /** Controlled selection. Without it the table keeps its own state. */
+  selected?: ReadonlySet<string>;
+  onSelectedChange?: (next: Set<string>) => void;
+  /** Column keys that can be sorted by clicking their header, and the current sort. */
+  sortableColumns?: ReadonlySet<string>;
+  sortState?: { column: string; dir: "asc" | "desc" } | null;
+  onSortColumn?: (columnKey: string) => void;
+  /** Opens the record when a row (not one of its controls) is clicked / Enter is pressed. */
+  onRowClick?: (row: T) => void;
+  /** Shown instead of rows when there is nothing to display. */
+  empty?: ReactNode;
+  loading?: boolean;
+  /** Added to the row index handed to column renderers (pagination). */
+  indexOffset?: number;
 }
+
+const INTERACTIVE = "button, a, input, select, textarea, label, [role='checkbox']";
 
 /**
  * Generic grouped data table. All view-specific appearance comes from the
@@ -83,30 +103,59 @@ export function DataTable<T>({
   sumRow,
   addRow,
   footer,
+  hiddenColumns,
+  selected: selectedProp,
+  onSelectedChange,
+  sortableColumns,
+  sortState,
+  onSortColumn,
+  onRowClick,
+  empty,
+  loading,
+  indexOffset = 0,
 }: DataTableProps<T>) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(selection?.initial ?? []));
+  const actions = useRecordActions();
+  const [ownSelected, setOwnSelected] = useState<Set<string>>(() => new Set(selection?.initial ?? []));
+  const selected = selectedProp ?? ownSelected;
+  const setSelected = (next: Set<string>) => (onSelectedChange ? onSelectedChange(next) : setOwnSelected(next));
+
+  const visibleColumns = useMemo(() => (hiddenColumns && hiddenColumns.size > 0 ? columns.filter((c) => !hiddenColumns.has(c.key)) : columns), [columns, hiddenColumns]);
   const allRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
   const allSelected = allRows.length > 0 && allRows.every((r) => selected.has(rowKey(r)));
-  const colCount = columns.length + (selection ? 1 : 0);
+  const colCount = visibleColumns.length + (selection ? 1 : 0);
   // The last column may be unsized (it absorbs free space); reserve a minimum for it.
-  const totalWidth = (selection?.width ?? 0) + columns.reduce((sum, c) => sum + (c.width ?? 120), 0);
+  const totalWidth = (selection?.width ?? 0) + visibleColumns.reduce((sum, c) => sum + (c.width ?? 120), 0);
+  const hasRows = allRows.length > 0;
 
-  const toggleRow = (id: string, on: boolean) =>
-    setSelected((s) => {
-      const next = new Set(s);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  const toggleRow = (id: string, on: boolean) => {
+    const next = new Set(selected);
+    if (on) next.add(id);
+    else next.delete(id);
+    setSelected(next);
+  };
 
-  let runningIndex = -1;
+  const rowHandlers = (row: T) =>
+    onRowClick
+      ? {
+          onClick: (e: MouseEvent<HTMLTableRowElement>) => {
+            if ((e.target as HTMLElement).closest(INTERACTIVE)) return;
+            onRowClick(row);
+          },
+          onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
+            if (e.key === "Enter" && e.target === e.currentTarget) onRowClick(row);
+          },
+          tabIndex: 0,
+        }
+      : {};
+
+  let runningIndex = indexOffset - 1;
 
   return (
     <div className={styles.wrap} style={{ ...themeToStyle(theme), minWidth: totalWidth + 2 }}>
       <table className={styles.table}>
         <colgroup>
           {selection && <col style={{ width: selection.width }} />}
-          {columns.map((c) => (
+          {visibleColumns.map((c) => (
             <col key={c.key} style={c.width ? { width: c.width } : undefined} />
           ))}
         </colgroup>
@@ -121,25 +170,58 @@ export function DataTable<T>({
                 />
               </th>
             )}
-            {columns.map((c, i) => (
-              <th
-                key={c.key}
-                scope="col"
-                className={cn(
-                  styles.th,
-                  i === 0 && !selection && c.align !== "center" && styles.thFirst,
-                  c.align === "center" && styles.alignCenter,
-                  c.align === "right" && styles.alignRight,
-                )}
-                style={padStyle(c.headPadLeft ?? c.padLeft, c.headPadRight ?? c.padRight)}
-              >
-                {c.header}
-              </th>
-            ))}
+            {visibleColumns.map((c, i) => {
+              const sortable = !!onSortColumn && !!sortableColumns?.has(c.key) && typeof c.header === "string";
+              const sorted = sortState?.column === c.key ? sortState.dir : null;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : undefined}
+                  className={cn(
+                    styles.th,
+                    i === 0 && !selection && c.align !== "center" && styles.thFirst,
+                    c.align === "center" && styles.alignCenter,
+                    c.align === "right" && styles.alignRight,
+                  )}
+                  style={padStyle(c.headPadLeft ?? c.padLeft, c.headPadRight ?? c.padRight)}
+                >
+                  {sortable ? (
+                    <button type="button" className={styles.sortBtn} onClick={() => onSortColumn?.(c.key)} title={`Sort by ${c.header as string}`}>
+                      {c.header}
+                      {sorted === "asc" && <ArrowUp size={12} strokeWidth={2.5} aria-hidden />}
+                      {sorted === "desc" && <ArrowDown size={12} strokeWidth={2.5} aria-hidden />}
+                    </button>
+                  ) : (
+                    c.header
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {groups.map((group, gi) => {
+          {loading && (
+            <>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={`sk-${i}`} className={cn(styles.row, i % 2 === 0 ? styles.rowA : styles.rowB)} aria-hidden>
+                  {Array.from({ length: colCount }, (_c, ci) => (
+                    <td key={ci} className={cn(styles.td, ci === 0 && styles.tdFirst)}>
+                      <SkeletonBar width={ci === 0 ? 24 : `${45 + ((i * 17 + ci * 23) % 40)}%`} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </>
+          )}
+          {!loading && !hasRows && empty && (
+            <tr>
+              <td className={styles.emptyTd} colSpan={colCount}>
+                {empty}
+              </td>
+            </tr>
+          )}
+          {!loading && groups.map((group, gi) => {
             const isCollapsed = collapsed.has(group.id);
             return (
               <Fragment key={group.id}>
@@ -160,7 +242,13 @@ export function DataTable<T>({
                   const id = rowKey(row);
                   const isSel = selected.has(id);
                   return (
-                    <tr key={id} className={cn(styles.row, index % 2 === 0 ? styles.rowA : styles.rowB, isSel && selection && styles.rowSelected)}>
+                    <tr
+                      key={id}
+                      className={cn(styles.row, index % 2 === 0 ? styles.rowA : styles.rowB, isSel && selection && styles.rowSelected, onRowClick && styles.rowClickable)}
+                      aria-selected={selection ? isSel : undefined}
+                      {...rowHandlers(row)}
+                    >
+                      <RowContext.Provider value={row}>
                       {selection && (
                         <td className={styles.td} style={padStyle(selection.padLeft ?? 16, 0)}>
                           <span className={styles.selCell}>
@@ -169,7 +257,7 @@ export function DataTable<T>({
                           </span>
                         </td>
                       )}
-                      {columns.map((c, ci) => (
+                      {visibleColumns.map((c, ci) => (
                         <td
                           key={c.key}
                           className={cn(
@@ -184,13 +272,14 @@ export function DataTable<T>({
                           {c.render(row, { index, selected: isSel })}
                         </td>
                       ))}
+                      </RowContext.Provider>
                     </tr>
                   );
                 })}
                 {!isCollapsed && sumRow && group.sums && (
                   <tr>
                     {selection && <td className={styles.sumTd} />}
-                    {columns.map((c, ci) => (
+                    {visibleColumns.map((c, ci) => (
                       <td
                         key={c.key}
                         className={cn(styles.sumTd, ci === 0 && !selection && styles.tdFirst, c.align === "right" && styles.alignRight, c.align === "center" && styles.alignCenter)}
@@ -204,7 +293,7 @@ export function DataTable<T>({
                 {!isCollapsed && addRow && (addRow.show ? addRow.show(group, gi) : true) && (
                   <tr>
                     <td className={styles.addTd} colSpan={colCount}>
-                      <AddRowButton tone={addRow.tone} />
+                      <AddRowButton tone={addRow.tone} onClick={actions?.add ? () => actions.add?.(group.id) : undefined} />
                     </td>
                   </tr>
                 )}

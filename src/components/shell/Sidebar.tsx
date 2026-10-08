@@ -5,16 +5,26 @@ import {
   Archive,
   Bookmark,
   Briefcase,
+  Banknote,
+  BookOpen,
   Building2,
+  ChartColumn,
   ChevronDown,
   CirclePlus,
   Clock,
+  CreditCard,
   Database,
   FileText,
   Folder,
+  HandCoins,
+  LayoutDashboard,
+  Library,
   List,
   Lock,
+  NotebookPen,
   Plus,
+  ReceiptText,
+  Scale,
   Search,
   Send,
   Settings,
@@ -22,11 +32,14 @@ import {
   SquareKanban,
   Star,
   Table2,
+  Truck,
   User,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import styles from "./shell.module.css";
 
@@ -51,6 +64,18 @@ const ICONS = {
   plusCircle: CirclePlus,
   kanban: SquareKanban,
   file: FileText,
+  // Accounting (AIS)
+  dashboard: LayoutDashboard,
+  book: BookOpen,
+  journal: NotebookPen,
+  ledger: Library,
+  invoice: ReceiptText,
+  payments: CreditCard,
+  receivable: HandCoins,
+  payable: Banknote,
+  vendor: Truck,
+  reports: ChartColumn,
+  scale: Scale,
 } as const;
 
 export type SidebarIconName = keyof typeof ICONS;
@@ -64,6 +89,8 @@ export interface SidebarItem {
   count?: number;
   countTone?: "red" | "purple";
   active?: boolean;
+  /** Navigates when set. Items without one are saved views that are not connected yet. */
+  href?: string;
 }
 
 export interface SidebarSection {
@@ -84,10 +111,12 @@ export interface SidebarConfig {
 }
 
 /**
- * Left sidebar. Only the active view of each screen is designed, so the other
- * entries are presentational (NEEDS CLARIFICATION: their destinations).
+ * Left sidebar. Only the active view of each BOSS screen is designed, so the other saved
+ * views tell the user they are not connected yet (NEEDS CLARIFICATION: their destinations).
+ * Sidebars built from routes (AIS) pass `href` on every item.
  */
-export function Sidebar({ config }: { config: SidebarConfig }) {
+export function Sidebar({ config, onCta }: { config: SidebarConfig; onCta?: () => void }) {
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -106,8 +135,7 @@ export function Sidebar({ config }: { config: SidebarConfig }) {
 
   return (
     <aside className={styles.sidebar} style={style} aria-label="Views">
-      {/* NEEDS CLARIFICATION: the creation flow behind "Create new …" is not designed. */}
-      <Button size="block" glow={config.ctaGlow} icon={<Plus size={16} strokeWidth={2.5} />}>
+      <Button size="block" glow={config.ctaGlow} icon={<Plus size={16} strokeWidth={2.5} />} onClick={onCta}>
         {config.cta}
       </Button>
       <label className={styles.finder}>
@@ -136,19 +164,35 @@ export function Sidebar({ config }: { config: SidebarConfig }) {
               <ul className={styles.list}>
                 {section.items.map((item) => {
                   const Icon = item.icon ? ICONS[item.icon] : null;
+                  const inner = (
+                    <>
+                      {item.dot ? (
+                        <span className={styles.dot} style={{ background: item.dot }} aria-hidden />
+                      ) : Icon ? (
+                        <span className={styles.itemIcon}>
+                          <Icon size={16} strokeWidth={1.75} />
+                        </span>
+                      ) : null}
+                      <span className={styles.label}>{item.label}</span>
+                      {item.count !== undefined && <span className={cn(styles.count, item.countTone === "purple" && styles.countPurple)}>{item.count}</span>}
+                    </>
+                  );
                   return (
                     <li key={item.id}>
-                      <button type="button" className={cn(styles.item, item.active && styles.itemActive)} aria-current={item.active ? "page" : undefined}>
-                        {item.dot ? (
-                          <span className={styles.dot} style={{ background: item.dot }} aria-hidden />
-                        ) : Icon ? (
-                          <span className={styles.itemIcon}>
-                            <Icon size={16} strokeWidth={1.75} />
-                          </span>
-                        ) : null}
-                        <span className={styles.label}>{item.label}</span>
-                        {item.count !== undefined && <span className={cn(styles.count, item.countTone === "purple" && styles.countPurple)}>{item.count}</span>}
-                      </button>
+                      {item.href ? (
+                        <Link href={item.href} className={cn(styles.item, item.active && styles.itemActive)} aria-current={item.active ? "page" : undefined}>
+                          {inner}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          className={cn(styles.item, item.active && styles.itemActive)}
+                          aria-current={item.active ? "page" : undefined}
+                          onClick={item.active ? undefined : () => toast.info(`“${item.label}” is a saved view that is not connected to data yet.`)}
+                        >
+                          {inner}
+                        </button>
+                      )}
                     </li>
                   );
                 })}

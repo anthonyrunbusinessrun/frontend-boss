@@ -3,13 +3,13 @@
 import { ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
-import type { FieldDef } from "@/components/popovers/fields";
+import { field, form, type FieldDef } from "@/components/popovers/fields";
 import type { SidebarConfig } from "@/components/shell/Sidebar";
 import type { Column } from "@/components/table/DataTable";
 import type { TableTheme } from "@/components/table/theme";
 import { LegendPanel, Workspace } from "@/components/view/Workspace";
 import type { RecordSet, VoucherRow } from "@/types";
-import { GroupLabel, usd } from "./cells";
+import { Dash, GroupLabel, usd } from "./cells";
 import styles from "./views.module.css";
 
 const sidebar: SidebarConfig = {
@@ -31,7 +31,20 @@ const sidebar: SidebarConfig = {
   ],
 };
 
-const fields: FieldDef[] = ["Voucher ID", "SP", "SVC", "Debit", "Credit", "Balance", "Scans", "Prefix", "Label", "ID", "Sum", "Cover"].map((name) => ({ name, kind: "text" }));
+const fields: FieldDef[] = [
+  field("Voucher ID", "voucherId", { form: form.text({ required: true }) }),
+  field("SP", "sp", { type: "number", form: form.number({ min: 0 }) }),
+  field("SVC", "svc", { form: form.text() }),
+  field("Debit", "debit", { type: "number", form: form.number({ min: 0 }) }),
+  field("Credit", "credit", { type: "number", form: form.number({ min: 0 }) }),
+  field("Balance", "balance", { type: "number", form: form.number() }),
+  field("Scans", "scans", { type: "number", form: form.number({ min: 0 }) }),
+  field("Prefix", "prefix", { form: form.text() }),
+  field("Label", "label", { form: form.text() }),
+  field("ID", "ref", { form: form.text() }),
+  field("Sum", "sum", { type: "number", form: form.number() }),
+  field("Cover", "cover"),
+];
 
 const theme: TableTheme = {
   border: "#0b1f3a",
@@ -85,7 +98,7 @@ const columns: Column<VoucherRow>[] = [
     padLeft: 0,
     render: (r) => (
       // NEEDS CLARIFICATION: cover art is clipped in the design; slivers cropped from the screen are used as placeholders.
-      <Image src={r.cover} alt="" width={56} height={20} className={styles.thumb} style={{ borderRadius: 3, width: 56, height: 20 }} />
+      r.cover ? <Image src={r.cover} alt="" width={56} height={20} className={styles.thumb} style={{ borderRadius: 3, width: 56, height: 20 }} /> : <Dash />
     ),
   },
 ];
@@ -98,6 +111,7 @@ export function VouchersView({ data, legend }: { data: RecordSet<VoucherRow>; le
       titleLight
       toolbar={{ hide: { label: "Hide fields" }, filter: { label: "Filter" }, group: { label: "Grouped by 1 field", active: true } }}
       fields={fields}
+      records={{ section: "vouchers", singular: "voucher", plural: "vouchers", label: (r) => r.voucherId, blank: () => ({ voucherId: "", sp: 0, svc: "", debit: 0, credit: 0, balance: 0, scans: 0, prefix: "", label: "", ref: "", sum: 0, cover: "" }) }}
       toolbarTop={61.5}
       tableGap={21.5}
       data={data}
