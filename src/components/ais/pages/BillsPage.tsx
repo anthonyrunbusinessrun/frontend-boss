@@ -65,7 +65,7 @@ export function BillsPage() {
   );
 
   const columns: Column<BillRow>[] = [
-    { key: "number", header: "Bill #", width: 100, render: (r) => <span className={styles.link}>{r.number}</span> },
+    { key: "number", header: "Bill #", width: 110, render: (r) => <span className={styles.link}>{r.number}</span> },
     { key: "vendor", header: "Vendor", width: 230, padLeft: 0, render: (r) => <span className={styles.strong}>{r.vendor}</span> },
     { key: "billDate", header: "Bill date", width: 110, padLeft: 0, render: (r) => <span className={styles.dim}>{formatDate(r.billDate)}</span> },
     { key: "dueDate", header: "Due", width: 110, padLeft: 0, render: (r) => <span className={r.displayStatus === "Overdue" ? styles.danger : styles.dim}>{formatDate(r.dueDate)}</span> },

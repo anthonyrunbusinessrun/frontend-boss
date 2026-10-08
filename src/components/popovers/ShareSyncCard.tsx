@@ -5,7 +5,7 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 import styles from "./popovers.module.css";
 
-export const SHARE_SYNC_CARD_WIDTH = 440;
+export const SHARE_SYNC_CARD_WIDTH = 380;
 
 /**
  * "Share and sync" — Cards:Modals/action-share-card.png.

@@ -136,7 +136,7 @@ export function BillDrawer({ request }: { request: DrawerRequest }) {
       <Drawer
         open
         onClose={requestClose}
-        width={900}
+        width={780}
         title={mode === "create" ? "New bill" : mode === "edit" ? `Edit bill ${existing?.number}` : `Bill ${existing?.number}`}
         subtitle={mode === "view" ? data.vendors.find((v) => v.id === existing?.vendorId)?.name : "Enter what the vendor billed you."}
         footerStart={

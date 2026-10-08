@@ -137,7 +137,7 @@ export function JournalDrawer({ request }: { request: DrawerRequest }) {
       <Drawer
         open
         onClose={requestClose}
-        width={980}
+        width={860}
         title={mode === "create" ? "New journal entry" : mode === "edit" ? `Edit ${existing?.number}` : (existing?.number ?? "")}
         subtitle={mode === "view" ? existing?.memo : "Every entry needs equal debits and credits."}
         footerStart={

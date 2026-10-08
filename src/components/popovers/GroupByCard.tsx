@@ -3,7 +3,7 @@
 import { ArrowRight, ChevronDown, CircleHelp, Ellipsis, Plus, SquareCheck, Square, Trash2 } from "lucide-react";
 import styles from "./popovers.module.css";
 
-export const GROUP_CARD_WIDTH = 640;
+export const GROUP_CARD_WIDTH = 520;
 
 /**
  * "Group by" — Cards:Modals/grouping-chip-filtering-card.png.

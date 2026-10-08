@@ -45,6 +45,9 @@ interface ViewToolbarProps {
   onExpandAll: () => void;
 }
 
+/** Field-list cards grow with their content up to this height, then scroll. */
+const LIST_CARD_MAX = "min(420px, calc(100dvh - 170px))";
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Toolbar under the page title (design-system §6.4). Each control opens its card and applies it to the table. */
@@ -85,7 +88,7 @@ export function ViewToolbar({ config, fields, controls, onCollapseAll, onExpandA
   return (
     <div className={styles.toolbar} role="toolbar" aria-label="View options">
       <div className={styles.cluster}>
-        <Popover {...sub("hide")} width={HIDDEN_CARD_WIDTH} label="Hide fields" trigger={chip("hide", <EyeOff {...icon} />, hideLabel, hideActive)} panelStyle={{ height: 657 }}>
+        <Popover {...sub("hide")} width={HIDDEN_CARD_WIDTH} label="Hide fields" trigger={chip("hide", <EyeOff {...icon} />, hideLabel, hideActive)} panelStyle={{ maxHeight: LIST_CARD_MAX }}>
           <HiddenFieldsCard fields={fields} hidden={controls.hidden} onChange={controls.onHidden} />
         </Popover>
         <Popover {...sub("filter")} width={FILTER_CARD_WIDTH} label="Filter" trigger={chip("filter", <Funnel {...icon} />, filterLabel, filterActive)}>
@@ -98,7 +101,7 @@ export function ViewToolbar({ config, fields, controls, onCollapseAll, onExpandA
         )}
       </div>
       <div className={styles.cluster}>
-        <Popover {...sub("sort")} width={SORT_CARD_WIDTH} align="right" label="Sort" trigger={chip("sort", <ArrowUpDown {...icon} />, sortLabel, controls.sort.length > 0)} panelStyle={{ height: 640 }}>
+        <Popover {...sub("sort")} width={SORT_CARD_WIDTH} align="right" label="Sort" trigger={chip("sort", <ArrowUpDown {...icon} />, sortLabel, controls.sort.length > 0)} panelStyle={{ maxHeight: LIST_CARD_MAX }}>
           <SortCard fields={fields} rules={controls.sort} onChange={controls.onSort} />
         </Popover>
         {!controls.simple && (

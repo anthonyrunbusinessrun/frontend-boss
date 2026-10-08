@@ -54,13 +54,13 @@ export function JournalPage() {
 
   const columns: Column<EntryRow>[] = [
     { key: "number", header: "Entry #", width: 100, render: (r) => <span className={styles.link}>{r.number}</span> },
-    { key: "date", header: "Date", width: 120, padLeft: 0, render: (r) => <span className={styles.dim}>{formatDate(r.date)}</span> },
-    { key: "memo", header: "Memo", width: 330, padLeft: 0, render: (r) => <span className={styles.strong}>{r.memo}</span> },
-    { key: "source", header: "Source", width: 130, padLeft: 0, render: (r) => <Badge tone={r.source === "Manual" ? "statusOpen" : "statusPartial"}>{r.source}</Badge> },
-    { key: "lineCount", header: "Lines", width: 80, align: "right", render: (r) => <span className={styles.dim}>{r.lineCount}</span> },
-    { key: "amount", header: "Amount", width: 140, align: "right", render: (r) => <Money cents={r.amount} /> },
+    { key: "date", header: "Date", width: 110, padLeft: 0, render: (r) => <span className={styles.dim}>{formatDate(r.date)}</span> },
+    { key: "memo", header: "Memo", width: 400, padLeft: 0, render: (r) => <span className={styles.strong}>{r.memo}</span> },
+    { key: "source", header: "Source", width: 100, padLeft: 0, render: (r) => <Badge tone={r.source === "Manual" ? "statusOpen" : "statusPartial"}>{r.source}</Badge> },
+    { key: "lineCount", header: "Lines", width: 70, align: "right", render: (r) => <span className={styles.dim}>{r.lineCount}</span> },
+    { key: "amount", header: "Amount", width: 130, align: "right", render: (r) => <Money cents={r.amount} /> },
     { key: "status", header: "Status", width: 110, padLeft: 16, render: (r) => <EntryStatusBadge status={r.status} /> },
-    { key: "actions", header: "Actions", width: 110, padLeft: 0, render: (r) => <RowActions icons={["edit", "delete"]} label={r.number} iconSize={15} /> },
+    { key: "actions", header: "Actions", width: 100, padLeft: 0, render: (r) => <RowActions icons={["edit", "delete"]} label={r.number} iconSize={15} /> },
   ];
   const fields = [
     field("Entry #", "number"), field("Date", "date", { type: "date" }), field("Memo", "memo"), field("Source", "source", { kind: "select" }),

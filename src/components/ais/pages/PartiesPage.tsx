@@ -55,13 +55,13 @@ export function PartiesPage({ party }: { party: "customer" | "vendor" }) {
 
   const columns: Column<PartyRow>[] = [
     { key: "code", header: "Code", width: 90, render: (r) => <span className={styles.link}>{r.code}</span> },
-    { key: "name", header: isCustomer ? "Customer" : "Vendor", width: 230, padLeft: 0, render: (r) => <span className={styles.strong}>{r.name}</span> },
-    { key: "email", header: "Email", width: 230, padLeft: 0, render: (r) => <span style={{ color: "var(--accent-cyan)" }}>{r.email || "–"}</span> },
-    { key: "terms", header: "Terms", width: 110, padLeft: 0, render: (r) => <span className={styles.dim}>{r.terms}</span> },
-    { key: "openBalance", header: isCustomer ? "Open balance" : "Amount owed", width: 130, align: "right", render: (r) => <Money cents={r.openBalance} dashZero /> },
+    { key: "name", header: isCustomer ? "Customer" : "Vendor", width: 250, padLeft: 0, render: (r) => <span className={styles.strong}>{r.name}</span> },
+    { key: "email", header: "Email", width: 290, padLeft: 0, render: (r) => <span style={{ color: "var(--accent-cyan)" }}>{r.email || "–"}</span> },
+    { key: "terms", header: "Terms", width: 108, padLeft: 0, render: (r) => <span className={styles.dim}>{r.terms}</span> },
+    { key: "openBalance", header: isCustomer ? "Open balance" : "Amount owed", width: 120, align: "right", render: (r) => <Money cents={r.openBalance} dashZero /> },
     { key: "status", header: "Status", width: 100, padLeft: 16, render: (r) => <PartyStatusBadge status={r.status} /> },
-    { key: "profileRef", header: "BOSS owner", width: 100, padLeft: 0, render: (r) => <BossRef code={r.profileRef} /> },
-    { key: "actions", header: "Actions", width: 100, padLeft: 0, render: (r) => <RowActions icons={["edit", "delete"]} label={r.name} iconSize={15} /> },
+    { key: "profileRef", header: "BOSS owner", width: 80, padLeft: 0, render: (r) => <BossRef code={r.profileRef} /> },
+    { key: "actions", header: "Actions", width: 80, padLeft: 0, render: (r) => <RowActions icons={["edit", "delete"]} label={r.name} iconSize={15} /> },
   ];
 
   const fields = [

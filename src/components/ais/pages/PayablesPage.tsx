@@ -51,14 +51,14 @@ export function PayablesPage() {
   );
 
   const columns: Column<ApRow>[] = [
-    { key: "number", header: "Bill #", width: 100, render: (r) => <span className={styles.link}>{r.number}</span> },
-    { key: "vendor", header: "Vendor", width: 210, padLeft: 0, render: (r) => <span className={styles.strong}>{r.vendor}</span> },
+    { key: "number", header: "Bill #", width: 110, render: (r) => <span className={styles.link}>{r.number}</span> },
+    { key: "vendor", header: "Vendor", width: 235, padLeft: 0, render: (r) => <span className={styles.strong}>{r.vendor}</span> },
     { key: "dueDate", header: "Due", width: 105, padLeft: 0, render: (r) => <span className={r.daysLate > 0 ? styles.danger : styles.dim}>{formatDate(r.dueDate)}</span> },
-    { key: "daysLate", header: "Days late", width: 85, align: "right", render: (r) => (r.daysLate > 0 ? <span className={styles.danger}>{r.daysLate}</span> : <span className={styles.muted}>–</span>) },
+    { key: "daysLate", header: "Days late", width: 75, align: "right", render: (r) => (r.daysLate > 0 ? <span className={styles.danger}>{r.daysLate}</span> : <span className={styles.muted}>–</span>) },
     { key: "total", header: "Bill total", width: 115, align: "right", render: (r) => <Money cents={r.total} /> },
     { key: "paid", header: "Paid", width: 105, align: "right", render: (r) => <Money cents={r.paid} dashZero /> },
     { key: "balance", header: "Balance", width: 115, align: "right", render: (r) => <Money cents={r.balance} /> },
-    { key: "displayStatus", header: "Status", width: 150, padLeft: 16, render: (r) => <StatusBadge status={r.displayStatus} /> },
+    { key: "displayStatus", header: "Status", width: 135, padLeft: 16, render: (r) => <StatusBadge status={r.displayStatus} /> },
     {
       key: "actions",
       header: "Actions",

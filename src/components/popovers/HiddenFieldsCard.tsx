@@ -6,8 +6,8 @@ import { cn } from "@/lib/cn";
 import { FieldIcon, type FieldDef } from "./fields";
 import styles from "./popovers.module.css";
 
-export const HIDDEN_CARD_WIDTH = 340;
-export const HIDDEN_CARD_HEIGHT = 657;
+export const HIDDEN_CARD_WIDTH = 300;
+export const HIDDEN_CARD_HEIGHT = 440;
 
 interface HiddenFieldsCardProps {
   fields: FieldDef[];
@@ -35,9 +35,9 @@ export function HiddenFieldsCard({ fields, hidden: controlled, onChange }: Hidde
   return (
     <>
       <div className={styles.managerHead}>
-        <Search size={20} className={styles.help} aria-hidden />
-        <input className={styles.managerSearch} placeholder="Find a field" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Find a field" />
-        <CircleHelp size={22} className={styles.help} aria-hidden />
+        <Search size={16} className={styles.help} aria-hidden />
+        <input autoFocus className={styles.managerSearch} placeholder="Find a field" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Find a field" />
+        <CircleHelp size={18} className={styles.help} aria-hidden />
       </div>
       <ul className={styles.managerList}>
         {shown.map((f) => {
@@ -46,7 +46,7 @@ export function HiddenFieldsCard({ fields, hidden: controlled, onChange }: Hidde
             <li key={f.name} className={styles.managerRow}>
               <button type="button" role="switch" aria-checked={visible} aria-label={`Show ${f.name}`} className={cn(styles.toggle, visible && styles.toggleOn)} onClick={() => toggle(f.name)} />
               <span className={styles.fieldIcon}>
-                <FieldIcon kind={f.kind} style="manager" size={20} />
+                <FieldIcon kind={f.kind} style="manager" size={16} />
               </span>
               <span className={styles.managerLabel}>{f.name}</span>
               {/* Reordering is implied by the drag handle but not designed. */}

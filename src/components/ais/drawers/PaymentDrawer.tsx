@@ -113,7 +113,7 @@ export function PaymentDrawer({ request }: { request: DrawerRequest }) {
         <Drawer
           open
           onClose={() => drawers.close()}
-          width={620}
+          width={540}
           title={`Payment ${existing.number}`}
           subtitle={`${received ? "Received from" : "Paid to"} ${party?.name ?? "unknown"}`}
           footerStart={<Button variant="secondary" size="md" icon={<Trash2 size={14} />} onClick={() => drawers.requestDelete("payment", existing.id)}>Delete payment</Button>}
@@ -166,7 +166,7 @@ export function PaymentDrawer({ request }: { request: DrawerRequest }) {
       <Drawer
         open
         onClose={requestClose}
-        width={760}
+        width={660}
         title={direction === "received" ? "Record payment received" : "Record payment made"}
         subtitle={direction === "received" ? "Apply money from a customer to their open invoices." : "Apply a payment to a vendor's approved bills."}
         footer={

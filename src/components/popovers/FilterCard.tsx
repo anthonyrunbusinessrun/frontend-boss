@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import type { FieldDef } from "./fields";
 import styles from "./popovers.module.css";
 
-export const FILTER_CARD_WIDTH = 608;
+export const FILTER_CARD_WIDTH = 540;
 
 /** Conditions drawn in the design (Profiles). Used by the dev gallery and as the Profiles starting point. */
 export const DESIGN_FILTER: FilterCondition[] = [
@@ -46,7 +46,7 @@ export function FilterCard({ fields, conditions: controlled, onChange }: FilterC
   return (
     <>
       <div className={styles.banner}>
-        <Info size={20} className={styles.bannerIcon} aria-hidden />
+        <Info size={16} className={styles.bannerIcon} aria-hidden />
         <p>
           The following 3 linked record fields are using this view&apos;s filter conditions for record selection:{" "}
           <span className={styles.bannerStrong}>Team Link</span> (from <span style={{ color: "var(--accent-cyan)", fontWeight: 700 }}>BOSS</span>) ,{" "}
@@ -63,7 +63,7 @@ export function FilterCard({ fields, conditions: controlled, onChange }: FilterC
         </h2>
         {/* AI prompt: no behaviour is designed for it. */}
         <label className={styles.prompt}>
-          <Sparkles size={22} className={styles.promptIcon} aria-hidden />
+          <Sparkles size={18} className={styles.promptIcon} aria-hidden />
           <input className={styles.promptInput} placeholder="Describe what you want to see…" aria-label="Describe what you want to see" />
         </label>
         <p className={styles.muted}>{rows.length === 0 ? "No filter conditions are applied. Add one to narrow this view." : "In this view, show records"}</p>

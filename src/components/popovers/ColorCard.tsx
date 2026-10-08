@@ -5,7 +5,7 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 import styles from "./popovers.module.css";
 
-export const COLOR_CARD_WIDTH = 380;
+export const COLOR_CARD_WIDTH = 340;
 
 const OPTIONS = [
   { id: "select", title: "Select field", sub: "Color records the same as a single select field", icon: <CircleChevronDown size={20} /> },

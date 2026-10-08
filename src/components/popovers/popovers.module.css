@@ -14,9 +14,10 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-popover);
   color: var(--text-body);
-  overflow: hidden;
+  overflow: hidden auto;
   text-align: left;
   font-weight: 400;
+  max-height: calc(100dvh - 150px);
 }
 .alignLeft {
   left: 0;
@@ -33,8 +34,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 43px;
-  padding: 0 16px;
+  min-height: 38px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border-subtle);
   flex: none;
 }
@@ -42,7 +43,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #fff;
 }
@@ -88,13 +89,13 @@
 }
 .searchInput {
   width: 100%;
-  height: 28px;
-  padding: 0 12px 0 40px;
+  height: 30px;
+  padding: 0 12px 0 34px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
 }
 .searchInput::placeholder {
@@ -105,7 +106,7 @@
 }
 .searchIcon {
   position: absolute;
-  left: 12px;
+  left: 10px;
   color: var(--text-secondary);
   pointer-events: none;
 }
@@ -114,8 +115,8 @@
 .sortBody {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 13px 15px 0;
+  gap: 8px;
+  padding: 10px 12px 0;
   min-height: 0;
   flex: 1;
 }
@@ -123,18 +124,18 @@
   overflow-y: auto;
   min-height: 0;
   flex: 1;
-  margin: 0 -15px;
-  padding: 0 15px 8px;
+  margin: 0 -12px;
+  padding: 0 12px 8px;
 }
 .fieldItem {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   width: 100%;
-  height: 33px;
+  height: 30px;
   padding: 0 9px;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 13px;
   color: #fff;
   text-align: left;
 }
@@ -145,7 +146,7 @@
   color: var(--text-secondary);
   display: inline-grid;
   place-items: center;
-  width: 20px;
+  width: 18px;
   flex: none;
 }
 
@@ -153,8 +154,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 43px;
-  padding: 0 16px;
+  height: 38px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border-subtle);
   flex: none;
 }
@@ -164,7 +165,7 @@
   border: 0;
   background: transparent;
   color: #fff;
-  font-size: 15px;
+  font-size: 13px;
   outline: none;
 }
 .managerSearch::placeholder {
@@ -174,15 +175,15 @@
   overflow-y: auto;
   min-height: 0;
   flex: 1;
-  padding: 8px 15px 8px 20px;
+  padding: 6px 12px 6px 14px;
 }
 .managerRow {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 34px;
+  gap: 10px;
+  height: 30px;
   color: #fff;
-  font-size: 15px;
+  font-size: 13px;
 }
 .managerRow .fieldIcon {
   color: #fff;
@@ -197,18 +198,18 @@
 }
 .managerFoot {
   display: flex;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 10px 14px;
   border-top: 1px solid var(--border-subtle);
   flex: none;
 }
 .footBtn {
   flex: 1;
-  height: 36px;
+  height: 32px;
   border-radius: var(--radius-md);
   background: #1e3a5f;
   color: #fff;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 .footBtn:hover {
@@ -218,8 +219,8 @@
 /* Toggle switch */
 .toggle {
   position: relative;
-  width: 36px;
-  height: 18px;
+  width: 32px;
+  height: 16px;
   border-radius: 999px;
   background: #2b3f5e;
   flex: none;
@@ -230,8 +231,8 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #f2f5fa;
   transition: transform 0.15s;
@@ -240,17 +241,17 @@
   background: #1565c0;
 }
 .toggleOn::after {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 /* ---------- Filter ---------- */
 .banner {
   display: flex;
-  gap: 12px;
-  padding: 20px 20px;
+  gap: 10px;
+  padding: 12px 14px;
   background: var(--bg-input);
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.55;
   color: var(--text-secondary);
   flex: none;
@@ -267,14 +268,14 @@
 .filterBody {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 10px 20px 23px;
+  gap: 12px;
+  padding: 10px 14px 16px;
 }
 .filterTitle {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
 }
@@ -285,18 +286,18 @@
 }
 .promptIcon {
   position: absolute;
-  left: 16px;
+  left: 12px;
   color: var(--accent-cyan);
 }
 .promptInput {
   width: 100%;
-  height: 38px;
-  padding: 0 16px 0 46px;
+  height: 32px;
+  padding: 0 12px 0 38px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
 }
 .promptInput::placeholder {
@@ -313,18 +314,18 @@
 .conditions {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 8px;
 }
 .condRow {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 8px;
 }
 .condLead {
-  width: 59px;
+  width: 52px;
   flex: none;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12.5px;
   text-align: right;
   padding-right: 4px;
 }
@@ -333,33 +334,34 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 32px;
-  padding: 0 10px 0 12px;
+  height: 30px;
+  padding: 0 8px 0 10px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: #fff;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 .selectField {
-  width: 159px;
+  width: 140px;
   flex: none;
 }
 .selectOp {
-  width: 79px;
+  width: 60px;
   flex: none;
 }
 .selectValue {
-  width: 153px;
-  flex: none;
+  width: auto;
+  flex: 1 1 90px;
   justify-content: flex-start;
   padding-left: 10px;
+  min-width: 0;
 }
 .condDelete {
   display: inline-grid;
   place-items: center;
-  width: 29px;
-  height: 32px;
+  width: 28px;
+  height: 30px;
   border-radius: var(--radius-md);
   background: var(--bg-input);
   color: var(--brand-red);
@@ -371,8 +373,8 @@
 .filterFoot {
   display: flex;
   align-items: center;
-  gap: 24px;
-  margin-top: 9px;
+  gap: 16px;
+  margin-top: 4px;
 }
 .footSpacer {
   margin-left: auto;
@@ -406,14 +408,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 8px 16px;
+  padding: 8px 8px 10px;
 }
 .option {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 16px 0 16px;
-  height: 70px;
+  gap: 12px;
+  padding: 0 14px;
+  height: 54px;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   text-align: left;
@@ -430,8 +432,8 @@
 .optionIcon {
   display: inline-grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--bg-input);
   color: var(--text-secondary);
@@ -443,28 +445,28 @@
 }
 .optionTitle {
   display: block;
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 600;
   color: #e8f1fb;
 }
 .optionSub {
   display: block;
-  font-size: 12.5px;
+  font-size: 12px;
   color: #7f95b0;
   margin-top: 2px;
 }
 
 .menu {
-  padding: 0 16px;
+  padding: 0 10px;
 }
 .menuItem {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  height: 44px;
-  padding: 0 16px;
-  font-size: 14px;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 13px;
   color: #fff;
   text-align: left;
 }
@@ -517,16 +519,16 @@
 }
 .noticeDismiss {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 .noticeGo {
-  height: 34px;
-  padding: 0 16px;
+  height: 30px;
+  padding: 0 14px;
   border-radius: 6px;
   background: #3a86c8;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 .lockBar {
@@ -535,7 +537,7 @@
   gap: 10px;
   margin: 0;
   padding: 0 16px;
-  height: 40px;
+  height: 34px;
   border-radius: 0;
   background: var(--bg-input);
   color: var(--text-secondary);
@@ -629,8 +631,8 @@
 .groupBody {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px 16px 22px;
+  gap: 10px;
+  padding: 12px 14px 16px;
 }
 .groupRow {
   display: flex;
@@ -639,18 +641,18 @@
 }
 .selectGrow {
   flex: 1;
-  height: 36px;
+  height: 32px;
 }
 .selectDir {
-  width: 140px;
+  width: 120px;
   flex: none;
-  height: 36px;
+  height: 32px;
 }
 .iconBtn {
   display: inline-grid;
   place-items: center;
   width: 30px;
-  height: 36px;
+  height: 32px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-input);
@@ -688,36 +690,36 @@
 .profileHead {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 17px 16px;
+  gap: 12px;
+  padding: 14px;
   border-bottom: 1px solid #e5e5e5;
 }
 .profileAvatar {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: #c62828;
   border: 2px solid #ef4444;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   flex: none;
 }
 .profileName {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
   line-height: 1.2;
 }
 .profileEmail {
-  font-size: 12.5px;
+  font-size: 12px;
   color: #4d6485;
   line-height: 1.3;
 }
 .profileGroup {
-  padding: 8px 8px;
+  padding: 6px 8px;
 }
 .profileGroup + .profileGroup {
   border-top: 1px solid #e5e5e5;
@@ -725,12 +727,12 @@
 .profileItem {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  height: 40.5px;
-  padding: 0 14px;
+  height: 34px;
+  padding: 0 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: #fff;
   text-align: left;
 }
@@ -853,7 +855,7 @@
   font-size: 13px;
 }
 .selectOpWide {
-  width: 130px;
+  width: 118px;
   flex: none;
 }
 .valueInput {

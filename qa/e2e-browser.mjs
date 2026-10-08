@@ -189,6 +189,21 @@ try {
   check("select-all shows the selection bar", (await text(page)).includes("selected"));
   await page.click('button[aria-label="Clear selection"]'); await sleep(200);
 
+  // sticky table header: nothing may show through above it while scrolling
+  await go("/ais/general-ledger");
+  await page.evaluate(() => { const b = [...document.querySelectorAll("div")].find((d) => getComputedStyle(d).overflowY === "auto" && d.querySelector("thead")); b.scrollTop = 520; });
+  await sleep(300);
+  const stick = await page.evaluate(() => { const b = [...document.querySelectorAll("div")].find((d) => getComputedStyle(d).overflowY === "auto" && d.querySelector("thead")); const r = b.getBoundingClientRect(); return { flush: Math.round(b.querySelector("thead th").getBoundingClientRect().top) === Math.round(r.top), hit: document.elementsFromPoint(r.left + 200, r.top + 2)[0].closest("thead") !== null }; });
+  check("sticky header is flush at the top while scrolling (no rows above it)", stick.flush && stick.hit, JSON.stringify(stick));
+  // toolbar cards stay within the viewport
+  await go("/profiles");
+  for (const chip of ["57 hidden fields", "Sort", "Filtered by Team, Inactive"]) {
+    await clickText(page, '[role="toolbar"] button', chip, true); await sleep(300);
+    const fit = await page.evaluate(() => { const r = document.querySelector('[role="dialog"]').getBoundingClientRect(); return { h: Math.round(r.height), ok: r.bottom <= innerHeight && r.right <= innerWidth }; });
+    check(`"${chip}" card fits the screen and is compact (${fit.h}px)`, fit.ok && fit.h <= 440, JSON.stringify(fit));
+    await page.keyboard.press("Escape"); await sleep(150);
+  }
+
   /* ============================ AIS ============================ */
   await go("/ais");
   const t0 = await text(page);

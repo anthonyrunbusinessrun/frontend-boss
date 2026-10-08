@@ -19,7 +19,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import styles from "./popovers.module.css";
 
-export const PROFILE_MENU_WIDTH = 320;
+export const PROFILE_MENU_WIDTH = 280;
 
 interface Item {
   label: string;

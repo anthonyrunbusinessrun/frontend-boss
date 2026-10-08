@@ -84,6 +84,12 @@ export interface DataTableProps<T> {
   indexOffset?: number;
 }
 
+/** Cells cut off with an ellipsis show their full text as a tooltip. */
+function revealIfTruncated(e: MouseEvent<HTMLTableCellElement>) {
+  const td = e.currentTarget;
+  if (td.scrollWidth > td.clientWidth + 1 && !td.title) td.title = td.innerText.trim();
+}
+
 const INTERACTIVE = "button, a, input, select, textarea, label, [role='checkbox']";
 
 /**
@@ -268,6 +274,7 @@ export function DataTable<T>({
                             c.align === "right" && styles.alignRight,
                           )}
                           style={padStyle(c.padLeft, c.padRight)}
+                          onMouseEnter={revealIfTruncated}
                         >
                           {c.render(row, { index, selected: isSel })}
                         </td>

@@ -159,7 +159,7 @@ export function InvoiceDrawer({ request }: { request: DrawerRequest }) {
       <Drawer
         open
         onClose={requestClose}
-        width={900}
+        width={780}
         title={mode === "create" ? "New invoice" : mode === "edit" ? `Edit invoice ${existing?.number}` : `Invoice ${existing?.number}`}
         subtitle={mode === "view" ? data.customers.find((c) => c.id === existing?.customerId)?.name : "Add the customer, dates and line items."}
         footerStart={

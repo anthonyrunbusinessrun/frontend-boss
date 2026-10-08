@@ -126,7 +126,7 @@ export function PartyDrawer({ party, request }: { party: "customer" | "vendor"; 
       <Drawer
         open
         onClose={requestClose}
-        width={600}
+        width={520}
         title={mode === "create" ? `New ${label}` : mode === "edit" ? `Edit ${label}` : (existing?.name ?? "")}
         subtitle={mode === "view" ? `${isCustomer ? "Customer" : "Vendor"} · ${existing?.code}` : undefined}
         footerStart={

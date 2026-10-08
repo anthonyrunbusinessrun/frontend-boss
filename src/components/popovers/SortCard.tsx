@@ -7,8 +7,8 @@ import { cn } from "@/lib/cn";
 import { FieldIcon, type FieldDef } from "./fields";
 import styles from "./popovers.module.css";
 
-export const SORT_CARD_WIDTH = 340;
-export const SORT_CARD_HEIGHT = 640;
+export const SORT_CARD_WIDTH = 300;
+export const SORT_CARD_HEIGHT = 440;
 
 const DIR_LABEL = {
   text: { asc: "A → Z", desc: "Z → A" },
@@ -82,8 +82,8 @@ export function SortCard({ fields, rules: controlled, onChange }: SortCardProps)
           </ul>
         )}
         <label className={styles.search}>
-          <Search size={18} className={styles.searchIcon} aria-hidden />
-          <input className={styles.searchInput} placeholder="Find a field" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Find a field" />
+          <Search size={16} className={styles.searchIcon} aria-hidden />
+          <input autoFocus className={styles.searchInput} placeholder="Find a field" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Find a field" />
         </label>
         <ul className={styles.fieldList}>
           {shown.map((f) => {
@@ -98,7 +98,7 @@ export function SortCard({ fields, rules: controlled, onChange }: SortCardProps)
                   onClick={() => setRules([...rules, { field: f.name, dir: "asc" }])}
                 >
                   <span className={styles.fieldIcon}>
-                    <FieldIcon kind={f.kind} style="sort" size={18} />
+                    <FieldIcon kind={f.kind} style="sort" size={16} />
                   </span>
                   {f.name}
                 </button>

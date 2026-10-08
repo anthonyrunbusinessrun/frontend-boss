@@ -85,14 +85,14 @@ export function LedgerPage() {
   const actions = useMemo(() => ({ open: (r: unknown) => drawers.open({ kind: "journal", mode: "view", id: (r as LedgerRow).entryId }) }), [drawers]);
 
   const columns: Column<LedgerRow>[] = [
-    { key: "date", header: "Date", width: 110, render: (r) => <span className={styles.dim}>{formatDate(r.date)}</span> },
+    { key: "date", header: "Date", width: 124, render: (r) => <span className={styles.dim}>{formatDate(r.date)}</span> },
     { key: "entryNumber", header: "Entry #", width: 90, padLeft: 0, render: (r) => <span className={styles.link}>{r.entryNumber}</span> },
-    { key: "account", header: "Account", width: 210, padLeft: 0, render: (r) => <span className={styles.strong}>{r.account}</span> },
-    { key: "description", header: "Description", width: 240, padLeft: 0, render: (r) => <span className={styles.dim}>{r.description}</span> },
+    { key: "account", header: "Account", width: 250, padLeft: 0, render: (r) => <span className={styles.strong}>{r.account}</span> },
+    { key: "description", header: "Description", width: 210, padLeft: 0, render: (r) => <span className={styles.dim}>{r.description}</span> },
     { key: "source", header: "Source", width: 100, padLeft: 0, render: (r) => <Badge tone={r.source === "Manual" ? "statusOpen" : "statusPartial"}>{r.source}</Badge> },
-    { key: "debit", header: "Debit", width: 120, align: "right", render: (r) => <Money cents={r.debit} dashZero /> },
-    { key: "credit", header: "Credit", width: 120, align: "right", render: (r) => <Money cents={r.credit} dashZero /> },
-    { key: "balance", header: "Balance", width: 140, align: "right", render: (r) => (r.balance === null ? <span className={styles.muted}>Select an account</span> : <Money cents={r.balance} />) },
+    { key: "debit", header: "Debit", width: 110, align: "right", render: (r) => <Money cents={r.debit} dashZero /> },
+    { key: "credit", header: "Credit", width: 110, align: "right", render: (r) => <Money cents={r.credit} dashZero /> },
+    { key: "balance", header: "Balance", width: 130, align: "right", render: (r) => (r.balance === null ? <span className={styles.muted}>Select an account</span> : <Money cents={r.balance} />) },
   ];
   const fields = [
     field("Date", "date", { type: "date" }), field("Entry #", "entryNumber"), field("Account", "account"), field("Description", "description"),

@@ -83,7 +83,14 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--table-gap, 20px) var(--pad-x, 20px) 20px;
+  /* No top padding: the sticky table header sits flush with the top of this scroll area, so rows
+     can never be seen scrolling through a gap above it. The gap is a spacer that scrolls away. */
+  padding: 0 var(--pad-x, 20px) 20px;
+}
+.body::before {
+  content: "";
+  display: block;
+  height: var(--table-gap, 20px);
 }
 .after {
   margin-top: 20px;

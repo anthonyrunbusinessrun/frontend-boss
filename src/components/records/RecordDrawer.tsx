@@ -99,7 +99,7 @@ function DrawerBody({ open, mode, singular, rowLabel, row, fields, groups, group
         onClose={requestClose}
         title={title}
         subtitle={subtitle}
-        width={560}
+        width={480}
         footerStart={footerStart}
         footer={
           mode === "view" ? (

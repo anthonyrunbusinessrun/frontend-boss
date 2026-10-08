@@ -54,18 +54,18 @@ export function ReceivablesPage() {
   );
 
   const columns: Column<ArRow>[] = [
-    { key: "number", header: "Invoice #", width: 100, render: (r) => <span className={styles.link}>{r.number}</span> },
-    { key: "customer", header: "Customer", width: 200, padLeft: 0, render: (r) => <span className={styles.strong}>{r.customer}</span> },
-    { key: "dueDate", header: "Due", width: 105, padLeft: 0, render: (r) => <span className={r.daysLate > 0 ? styles.danger : styles.dim}>{formatDate(r.dueDate)}</span> },
-    { key: "daysLate", header: "Days late", width: 85, align: "right", render: (r) => (r.daysLate > 0 ? <span className={styles.danger}>{r.daysLate}</span> : <span className={styles.muted}>–</span>) },
-    { key: "total", header: "Invoice total", width: 115, align: "right", render: (r) => <Money cents={r.total} /> },
-    { key: "paid", header: "Paid", width: 105, align: "right", render: (r) => <Money cents={r.paid} dashZero /> },
-    { key: "balance", header: "Balance", width: 115, align: "right", render: (r) => <Money cents={r.balance} /> },
-    { key: "displayStatus", header: "Status", width: 125, padLeft: 16, render: (r) => <StatusBadge status={r.displayStatus} /> },
+    { key: "number", header: "Invoice #", width: 95, render: (r) => <span className={styles.link}>{r.number}</span> },
+    { key: "customer", header: "Customer", width: 235, padLeft: 0, render: (r) => <span className={styles.strong}>{r.customer}</span> },
+    { key: "dueDate", header: "Due", width: 100, padLeft: 0, render: (r) => <span className={r.daysLate > 0 ? styles.danger : styles.dim}>{formatDate(r.dueDate)}</span> },
+    { key: "daysLate", header: "Days late", width: 70, align: "right", render: (r) => (r.daysLate > 0 ? <span className={styles.danger}>{r.daysLate}</span> : <span className={styles.muted}>–</span>) },
+    { key: "total", header: "Invoice total", width: 105, align: "right", render: (r) => <Money cents={r.total} /> },
+    { key: "paid", header: "Paid", width: 95, align: "right", render: (r) => <Money cents={r.paid} dashZero /> },
+    { key: "balance", header: "Balance", width: 105, align: "right", render: (r) => <Money cents={r.balance} /> },
+    { key: "displayStatus", header: "Status", width: 115, padLeft: 16, render: (r) => <StatusBadge status={r.displayStatus} /> },
     {
       key: "actions",
       header: "Actions",
-      width: 170,
+      width: 200,
       padLeft: 0,
       render: (r) => (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>

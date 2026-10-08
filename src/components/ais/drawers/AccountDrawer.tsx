@@ -97,7 +97,7 @@ export function AccountDrawer({ request }: { request: DrawerRequest }) {
       <Drawer
         open
         onClose={requestClose}
-        width={560}
+        width={480}
         title={mode === "create" ? "New account" : mode === "edit" ? "Edit account" : `${existing?.code} · ${existing?.name}`}
         subtitle={mode === "view" ? "Chart of accounts" : undefined}
         footerStart={
