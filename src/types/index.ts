@@ -153,3 +153,37 @@ export interface LeadRow {
   url: string;
 }
 
+export interface PacketRow {
+  id: string;
+  title: string;
+  folder: string | null;
+  recordId: string;
+  folio: string;
+  url: string | null;
+  isFolder: boolean;
+  parentFolder: string | null;
+}
+
+export interface AccountRow {
+  id: string;
+  code: string;
+  title: string;
+  type: string;
+  def: string;
+  stmt: string;
+  debits: number;
+  credits: number;
+  balance: number;
+  transactions: number;
+  frequent: "Yes" | "No";
+}
+
+export interface RegistryRow {
+  id: string;
+  name: string;
+  attachment: string;
+  status: "Coming Due" | "Current";
+  expiry: string;
+  notes: string | null;
+}
+
