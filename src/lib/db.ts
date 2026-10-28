@@ -10,11 +10,15 @@ function createPool() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return null;
 
-  return new Pool({
+  const pool = new Pool({
     connectionString,
     max: Number(process.env.PG_POOL_MAX ?? 10),
     ssl: process.env.PGSSLMODE === "require" ? { rejectUnauthorized: false } : undefined,
   });
+  // An idle connection can be dropped when the database restarts or fails over. Without a listener the
+  // 'error' event would crash the whole server; the pool replaces the connection on the next query.
+  pool.on("error", (error) => console.error("[db] idle connection error:", error.message));
+  return pool;
 }
 
 export const db = globalThis.bossPostgresPool ?? createPool();

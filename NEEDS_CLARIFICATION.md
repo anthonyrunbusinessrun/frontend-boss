@@ -1,67 +1,97 @@
-# NEEDS CLARIFICATION
+# Assumptions and open questions
 
-Everything below was either missing from the supplied designs, contradicted by them, or inferred.
-None of it was invented silently: each item is also marked `NEEDS CLARIFICATION` in a code comment
-next to the code it affects.
+Everything here was either not determinable from the Airtable screenshots / existing code, or is a choice
+that should be confirmed. Nothing is hidden: each item says what the app does today.
 
-## 1. Screens and flows that were not designed
+## 1. Security and users (most important)
 
-| Area | What the app does today |
+| Topic | What the app does today |
 | --- | --- |
-| **BOSS tab** | No screen exists. `/boss` shows a marked placeholder. |
-| **"Forgot Password?"** | Rendered, links to `#forgot-password`; no destination designed. |
-| **Landing page after sign-in / sign-up** | Assumed `/profiles` (`DEFAULT_SECTION` in `src/lib/sections.ts`). |
-| **Auth** | No backend, validation, error states or session. Submitting only navigates. There is **no auth guard** on workspace routes. |
-| **Sign-in values** | The design shows the email and an 8-dot password pre-filled. These are mock `defaultValue`s. |
-| **Global search** | Filters the table of the current screen. Cross-screen results (the placeholder mentions profiles, transactions and categories) are not designed. |
-| **"Create new …" buttons** | Open a generated new-record drawer. The form layout is not designed: fields come from each view's `FieldDef`s. |
-| **Row actions** (edit / duplicate / delete) | Work through the same drawer. Duplicate opens a pre-filled new record; delete asks for confirmation and offers Undo. Edits are kept in `localStorage`, not the database. |
-| **"Add row"** | Opens the new-record drawer with the group preselected. |
-| **Sidebar views other than the active one** | Only the active view of each screen is designed. Clicking another shows a toast that the saved view is not connected. Collapse and "Find a view…" filtering work. |
-| **Pagination** | Real (25 rows per page). Footer counts are the actual row counts, so they no longer reproduce the design's fixed figures (e.g. Profiles reads "of 12", not "of 14"). The pagination check in `qa/interact.py` was updated to match, but Playwright was not available where this was built, so that script has not been re-run. |
-| **Share dialog** (`Share "BOSS"`) | No control anywhere opens it. It exists only in the dev gallery (`/dev/cards`). Its "Share to web" tab is not designed. |
-| **Share and sync actions** | "Create link", "Sync data", "Embed", "Create a form view", "Go to interfaces" and "Learn more" have no destinations. "Dismiss" works. |
-| **Color card** | Only step 1 (choose "Select field" / "Conditions") is designed. |
-| **Filter card** | Conditions now filter the table (operators by field type). AI prompt, "Add condition group" and "Copy from another view" are still not designed and do nothing. The design's initial Profiles conditions (Team, Inactive) are shown but have no data field to evaluate. |
-| **Group card** | "Add subgroup", direction and remove-group controls are not designed. "Collapse all" / "Expand all" work on the table. |
-| **Sort / Hide fields** | Sorting by a field and hiding a column work. Fields drawn in the cards that have no column or data in the view (e.g. most of the 57 hidden Profiles fields) cannot be sorted or hidden. Hiding a field adds to the "N hidden fields" count. Reordering (drag handle) is not designed. |
+| **Authentication** | None. Sign-in / sign-up are the original mock screens and no route is guarded. |
+| **Who is “the user”?** | An anonymous id in an httpOnly cookie (one per browser). Favorites and personal views belong to it. Clearing cookies, or using another browser, is a different user. |
+| **Write protection** | Same-origin check only. Anyone who can reach the site can read and change data. Add real auth before going live. |
+| **Permissions** | Collaborative / Personal / Locked views are enforced on the server against that cookie id. There are no roles (admin / editor / viewer). |
 
-## 2. Contradictions and slips in the designs
+## 2. Views, sections and sidebar
 
-- **CTA labels**: Actions says "Create new **profile**", Vouchers says "Create new **category**", and Accounts, Forms, Concepts, Capabilities, Leads and Registries say "Create new **item**". Kept as designed.
-- **Tab count**: the design doc says 14 tabs; `Components/tabs-bar.png` and the screens show 15.
-- **Screen count**: the doc says 14 primary views; 16 screens were supplied (two are auth).
-- **Record counts**: Transactions badge says "10 Items Listed" over four rows; Concepts footer says "1–2 of 2 records" over nine rows; Categories group "2.0 INTERNAL" says 5 items over four rows; Leads group "CLIENT : FEMA" contains other clients; Hide-fields card shows all toggles on while Profiles says "57 hidden fields". Reproduced as drawn.
-- **"Grouped by" labels** on Actions, Forms, Folios and Packet show no groups, or only some.
-- **Accounts balance** wraps as `$152,430 / .00` in the design. That is a layout flaw and is **not** reproduced.
-- **Vouchers** header text and cell text are offset by ~16px in places in the design; this is reproduced with per-column header padding.
-- **Profiles toolbar**: the right-hand cluster ends 33px short of the table edge (all other screens end at the edge). Reproduced via `toolbarInsetRight`.
-- **Add-row icon style** differs from the one described in the design doc; the screens were followed.
+- **“Section” and “folder” are one thing.** The Create menu's *Section* and the folders in the sidebar organization
+  requirements are the same entity. Sections do not nest.
+- Deleting a section moves its views back to the sidebar; no view or record is deleted.
+- A table must keep at least one view (the last one cannot be deleted).
+- “Collaborative / Personal / Locked” follows the Airtable dialog in your screenshot. A locked view can be
+  unlocked only by its owner (any user, for the seeded views, which have no owner).
+- Section collapsed / expanded state is remembered per browser, not per account.
+- Gantt dependencies are a *link to the same table* field. The view offers to create one; there is no
+  built-in “predecessor” type.
+- Timeline / Gantt bars can be dragged to move them, or by the right edge to change the end date.
+- Calendar shows one month at a time (no week or day layout). Records without a date are listed as “no date”.
+- All filtering, sorting and grouping happens in the browser over the table's records. That is fine for
+  thousands of rows; very large tables would need server-side queries.
+- A view setting changed and then followed by a refresh within ~250 ms can be lost (it is saved after a short delay).
 
-## 3. Clipped or truncated artwork
+## 3. Team Profile
 
-- Profiles columns after **Address**, Folios and Capabilities trailing columns, and voucher **cover images** are cut off at the frame edge. Cover images are 56×20 slivers cropped from the screen.
-- Text truncated with an ellipsis in the design is **inferred** in mock data (marked in each `src/data/*.ts`): Forms (long titles, descriptions), Leads (titles), Capabilities (overview, notes, tagline), Transactions (memo, voucher detail), Items (overview).
-- The **logo** is a 64px raster crop from the sign-up screen; a vector logo is needed.
+- The existing Profiles table is treated as the team directory: the one-time migration marked every existing profile
+  as `Team = checked` and `Inactive = unchecked`. Un-check Team for vendors / clients that should not be assignable.
+- Fields were taken from the visible columns of the Airtable “Team Profiles” view (Contact, Hard Code, SMS Opt In,
+  Sal, Name, Position, Billing, Type, eMail, Address, Phone 1–3 and titles, Team, Inactive) plus **Photo** and **Bio**.
+  The 57 hidden Airtable fields were not visible, so they are not modeled.
+- Contact code and eMail must be unique (case-insensitive).
+- The Airtable sidebar's other profile views (Company, Client, Vendor, Fleet, Team Bios, Text Blast…) were not
+  recreated: nothing in the data says how they are filtered. Create them with Filter + Create new…
 
-## 4. Technical choices that need confirmation
+## 4. Categories and Folios
 
-- Mock data is served through `src/services`. No API contract exists; the `RecordSet<T>` types are the proposed contract.
-- Fonts: Inter (variable) via `@fontsource-variable/inter`, self-hosted.
-- Minimum supported width is 960px (the designs are 1440px only). No tablet or mobile layouts were designed.
+- The **Group** field is removed from Categories (column and input). Stored `group` values stay in the records.
+- Folio **Cord → Assignee**: existing values were matched to profiles by contact code (e.g. `EJE`). A value without a
+  unique match keeps its text and is shown muted until someone links it. The migration prints how many.
+- Folio **Category** was matched to category records by title the same way.
+- Folio also has its own **Group** text field (unchanged: only Categories lost Group).
+- Categories' **Folios** column is now a read-only list of the folios that point at the category.
 
-## 5. Accounting Information System (AIS)
+## 5. Vouchers (from the Infant & Toddler screenshot)
 
-The AIS follows the layout agreed in the combined BOSS + AIS design. What the design did not settle:
+- Columns follow the screenshot: **I** (autonumber, starts at 11574), **No** (= I + 1000), **VSF**, **Manifest**, **QR**.
+- *VSF* is modeled as a single select with one option (“VSF”) because the meaning is not visible. *Manifest* is long
+  text (one line per shipment line); the screenshot suggests it may link to a Manifest table that does not exist here.
+- The Bill of Lading preview/print uses extra fields (accrual date, consignee, ship to, deliver via, resource,
+  tracking, note, terms), hidden in the “Simplified” view. The voucher number is `LLG-BL-` + (I + 4000), from
+  I 11578 → LLG-BL-15578 in the screenshot. The letterhead (Land Logistics) is in
+  `src/components/base/vouchers/voucherConfig.ts`.
+- **QR codes** encode a link to the voucher in this app (`/vouchers?record=…`). The “Run” button generates a QR
+  image for vouchers without one and stores it as an attachment.
+- The previous ledger fields (Voucher ID, SP, SVC, Debit, Credit, Balance, Scans, Prefix, Label, ID, Sum, Cover)
+  are kept, hidden, and visible in the “Ledger (previous layout)” view. No accounting rules are applied to them.
+- The screenshot's “Extensions” panel is a Voucher tools panel here; the “Edit code” part is not reproduced.
 
-| Area | What the app does today |
-| --- | --- |
-| **Navigation entries not built** | The AIS design also lists Estimates, Credit Notes, Expenses, Banking, Inventory, Projects and Budgeting. They were not part of the requested workflows, so no pages or placeholder routes exist. `components/ais/nav.ts` is the single place to add them. |
-| **Budget tile / alert** | The design's "Budget Utilization" tile and "Marketing over budget" alert depend on Budgeting. The tile is replaced by "Avg days to collect"; the alert is not produced. |
-| **Dashboard figures** | Calculated from the sample books, so they differ from the figures in the design mock. The Weekly / Quarterly / Yearly chart toggles are not implemented (the chart shows the last 6 months). |
-| **Reporting date** | Fixed at 30 Sep 2026 in the sample data (Settings). "This month", aging and overdue flags use it instead of today's date. |
-| **Customers / vendors and BOSS profiles** | Linked only by an optional "BOSS account owner" field holding a profile contact code (e.g. `EJH`). Nothing reads the BOSS profile data yet. |
-| **Persistence** | The books are stored in the browser (`localStorage`). There is no multi-user access, audit trail or period closing; posted entries are read-only and corrected by reversal. |
-| **Payments** | Recorded payments cannot be edited, only deleted and re-entered. |
-| **Export** | Lists and reports export CSV. PDF / print layouts are not built. |
-| **Tax, multi-currency, attachments** | Not in the design; not implemented. |
+## 6. Items (inventory)
+
+- Added: SKU (unique), Category (single select, editable), Unit (single select), Reorder level, and a computed
+  **Stock status**: *Out of stock* at 0, *Low stock* at or below the reorder level, otherwise *In stock*.
+- The *Category* options (Feeding, Diapering, Comfort, Hygiene) and Unit options are starting values: edit them in the
+  field settings. Items do **not** use the Folio Categories table because those are filing categories.
+- “Adjust stock” changes the quantity (add / remove / set) and cannot go below zero. There is no movement history.
+
+## 7. Capabilities
+
+- The three areas are filters on a new single-select field **Area** (*System* / *Exception*); **All** shows
+  everything. System and Exception were not defined anywhere in the data, so they are whatever you set Area to.
+- On a fresh database the five System and four Exception capabilities are transcribed from your screenshots.
+  An existing database is **not** given Area values: set them in the grid.
+- LIVE = GO checked, as the name suggests; confirm.
+
+## 8. Data and migration
+
+- No record is deleted by any migration. Legacy properties are never removed.
+- Packet, Accounts and Registries rows stay in the database; their API entries and screens are gone.
+- Attachments are stored in PostgreSQL (≤ 5 MB each). For many large files, move them to object storage.
+- “Delete field” removes the field from every view and form but keeps the stored values in the records.
+- Imports: `scripts/import-airtable.py` still mirrors Airtable CSVs into `airtable_tables` (read-only). It does not
+  yet map them onto the new fields.
+
+## 9. UI
+
+- The look stays BOSS dark navy/red. The Airtable screenshots were used for structure and behavior only.
+- Layout is designed for desktop and tablet widths. Phone layouts are usable but not tuned; the app frame
+  still has a 960 px minimum width on most screens.
+- The legacy design-fidelity scripts and the AIS module are not part of the new navigation.

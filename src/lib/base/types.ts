@@ -1,0 +1,250 @@
+/**
+ * Shared (browser + server) types of the BOSS table engine.
+ *
+ *   table   = a row of `boss_sections` (its slug is the table id)
+ *   field   = a row of `boss_fields`   (its `key` is the property name inside the record JSON)
+ *   record  = a row of `boss_records`  (JSONB `data`, keyed by field key)
+ *   view    = a row of `boss_views`    (type + saved configuration)
+ *   section = a row of `boss_nav_sections` (a named group of views in the sidebar)
+ */
+
+export const FIELD_TYPES = [
+  "text",
+  "longText",
+  "number",
+  "date",
+  "checkbox",
+  "singleSelect",
+  "multiSelect",
+  "attachment",
+  "url",
+  "email",
+  "phone",
+  "link",
+  "computed",
+  "autonumber",
+] as const;
+export type FieldType = (typeof FIELD_TYPES)[number];
+
+export const VIEW_TYPES = ["grid", "calendar", "gallery", "kanban", "timeline", "list", "gantt", "form"] as const;
+export type ViewType = (typeof VIEW_TYPES)[number];
+
+export type ViewAccess = "collaborative" | "personal" | "locked";
+
+export const CHOICE_COLORS = ["blue", "cyan", "green", "yellow", "orange", "red", "pink", "purple", "gray"] as const;
+export type ChoiceColor = (typeof CHOICE_COLORS)[number];
+
+export interface Choice {
+  id: string;
+  name: string;
+  color: ChoiceColor;
+}
+
+/** Whitelisted computed (read-only) fields. No user-supplied expressions are ever evaluated. */
+export type ComputedSpec =
+  | { fn: "offset"; source: string; add: number }
+  | { fn: "stockStatus"; qty: string; reorder: string }
+  /** Reverse lookup: labels of the records in `table` whose link field `key` points at this record. */
+  | { fn: "linkedFrom"; table: string; key: string };
+
+export interface FieldOptions {
+  /** singleSelect / multiSelect */
+  choices?: Choice[];
+  /** multiSelect: values that are not in `choices` are accepted (free tags). */
+  allowOther?: boolean;
+  /** number */
+  format?: "integer" | "decimal" | "currency" | "percent";
+  precision?: number;
+  min?: number;
+  max?: number;
+  /** date */
+  includeTime?: boolean;
+  /** link */
+  linkTable?: string;
+  multiple?: boolean;
+  /** link: only records whose `key` equals `equals` may be linked (e.g. team members only). */
+  linkFilter?: { key: string; equals: string | boolean | number };
+  /** link: record property holding the pre-relationship text value (kept so no data is lost). */
+  legacyKey?: string;
+  /** computed */
+  computed?: ComputedSpec;
+  /** autonumber: first number handed out */
+  start?: number;
+  /** values must be unique within the table (case-insensitive for text) */
+  unique?: boolean;
+  /** attachment: only images are accepted */
+  imagesOnly?: boolean;
+  /** checkbox: how a checked value is drawn in grids and cards */
+  icon?: "check" | "flag";
+  /** shown under the input in forms and the record drawer */
+  help?: string;
+  placeholder?: string;
+}
+
+export interface FieldDef {
+  /** Property name in the record JSON. Stable: renaming a field changes `name`, never `key`. */
+  key: string;
+  name: string;
+  type: FieldType;
+  options: FieldOptions;
+  position: number;
+  required: boolean;
+  /** The field that names a record (cards, links, drawer title). One per table. */
+  primary: boolean;
+}
+
+export interface AttachmentValue {
+  /** id in `boss_files`; empty for bundled static assets */
+  id: string;
+  name: string;
+  url: string;
+  type?: string;
+  size?: number;
+}
+
+export type RecordRow = { id: string } & Record<string, unknown>;
+
+/* ----------------------------- filters / sorts / groups ----------------------------- */
+
+export type FilterOp =
+  | "contains"
+  | "notContains"
+  | "is"
+  | "isNot"
+  | "isEmpty"
+  | "isNotEmpty"
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "before"
+  | "after";
+
+export interface FilterRule {
+  id: string;
+  join: "and" | "or";
+  field: string;
+  op: FilterOp;
+  value?: string | number | boolean | null;
+}
+
+export interface SortRule {
+  field: string;
+  dir: "asc" | "desc";
+}
+
+export interface GroupRule {
+  field: string;
+  dir: "asc" | "desc";
+}
+
+/* ------------------------------------ views ------------------------------------ */
+
+export interface FormFieldConfig {
+  key: string;
+  visible: boolean;
+  required: boolean;
+  /** Overrides the field name in the form. */
+  label?: string;
+  help?: string;
+}
+
+export interface FormConfig {
+  title: string;
+  description: string;
+  submitLabel: string;
+  successMessage: string;
+  fields: FormFieldConfig[];
+}
+
+export interface ViewConfig {
+  filters: FilterRule[];
+  sort: SortRule[];
+  groupBy: GroupRule[];
+  /** Field keys hidden in this view. */
+  hidden: string[];
+  /** Field keys in display order (missing keys follow in table order). */
+  order?: string[];
+  /** Grid column widths by field key. */
+  widths?: Record<string, number>;
+  /** Stable name for seeded views so the UI can reference them (e.g. "system"). */
+  key?: string;
+
+  /* calendar */
+  dateField?: string;
+  endDateField?: string;
+  /* gallery */
+  coverField?: string;
+  cardSize?: "small" | "medium" | "large";
+  /* kanban */
+  stackField?: string;
+  hideEmptyStacks?: boolean;
+  /* timeline + gantt */
+  startField?: string;
+  endField?: string;
+  dependencyField?: string;
+  colorField?: string;
+  /* list + cards */
+  titleField?: string;
+  /* form */
+  form?: FormConfig;
+}
+
+export interface ViewDef {
+  id: string;
+  table: string;
+  name: string;
+  type: ViewType;
+  config: ViewConfig;
+  access: ViewAccess;
+  ownerId: string | null;
+  sectionId: string | null;
+  position: number;
+}
+
+export interface SectionDef {
+  id: string;
+  table: string;
+  name: string;
+  position: number;
+}
+
+export interface FavoriteDef {
+  kind: "view" | "record";
+  refId: string;
+  position: number;
+}
+
+/** What the browser needs to render one table. */
+export interface TableBundle {
+  table: { slug: string; name: string };
+  fields: FieldDef[];
+  records: RecordRow[];
+  views: ViewDef[];
+  sections: SectionDef[];
+  favorites: FavoriteDef[];
+  /** Records of tables linked from this table's fields, reduced to what pickers need. */
+  linked: Record<string, LinkedTable>;
+  /** Current user id; `null` before the browser has been given one. */
+  userId: string | null;
+}
+
+export interface LinkedRecord {
+  id: string;
+  label: string;
+  photo?: string;
+  sub?: string;
+  /** Raw values used by `linkFilter` (e.g. { team: true }). */
+  filter: Record<string, unknown>;
+}
+
+export interface LinkedTable {
+  slug: string;
+  name: string;
+  primaryKey: string;
+  records: LinkedRecord[];
+}
+
+export const emptyViewConfig = (): ViewConfig => ({ filters: [], sort: [], groupBy: [], hidden: [] });

@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
@@ -22,7 +22,8 @@ function useDialogBehavior<T extends HTMLElement>(open: boolean, onClose: () => 
     closeRef.current = onClose;
   });
 
-  useEffect(() => {
+  // Layout effect: the Escape / Tab handling is live as soon as the dialog is on screen, not a frame later.
+  useLayoutEffect(() => {
     if (!open) return;
     const token = Symbol("dialog");
     dialogStack.push(token);

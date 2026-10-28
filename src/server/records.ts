@@ -7,16 +7,13 @@ export const sectionNames = {
   categories: "Categories",
   folios: "Folios",
   actions: "Actions",
-  packet: "Packet",
   vouchers: "Vouchers",
   transactions: "Transactions",
   items: "Items",
-  accounts: "Accounts",
   forms: "Forms",
   concepts: "Concepts",
   capabilities: "Capabilities",
   leads: "Leads",
-  registries: "Registries",
 } as const;
 
 export type DataSection = keyof typeof sectionNames;

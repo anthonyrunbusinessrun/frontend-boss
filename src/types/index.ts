@@ -61,17 +61,6 @@ export interface ActionRow {
   qa: boolean;
 }
 
-export interface PacketRow {
-  id: string;
-  title: string;
-  folder: string | null;
-  recordId: string;
-  folio: string;
-  url: string | null;
-  isFolder: boolean;
-  parentFolder: string | null;
-}
-
 export interface VoucherRow {
   id: string;
   voucherId: string;
@@ -115,20 +104,6 @@ export interface ItemRow {
   qty: number;
   kit: "Kit Alpha" | "Kit Beta" | "Kit Gamma" | "Kit Delta";
   assigned: string;
-}
-
-export interface AccountRow {
-  id: string;
-  code: string;
-  title: string;
-  type: string;
-  def: string;
-  stmt: string;
-  debits: number;
-  credits: number;
-  balance: number;
-  transactions: number;
-  frequent: "Yes" | "No";
 }
 
 export interface FormRow {
@@ -178,11 +153,3 @@ export interface LeadRow {
   url: string;
 }
 
-export interface RegistryRow {
-  id: string;
-  name: string;
-  attachment: string;
-  status: "Coming Due" | "Current";
-  expiry: string;
-  notes: string | null;
-}

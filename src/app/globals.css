@@ -126,3 +126,10 @@ ul {
     animation: none !important;
   }
 }
+
+/* Printing a voucher: show only the Bill of Lading. */
+@media print {
+  body * { visibility: hidden !important; }
+  [data-print-area], [data-print-area] * { visibility: visible !important; }
+  [data-print-area] { position: fixed; inset: 0; width: 100%; margin: 0; padding: 12mm; }
+}

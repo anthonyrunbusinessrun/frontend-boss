@@ -1,137 +1,153 @@
-# BOSS Airtable — frontend
+# BOSS — internal Airtable-style platform
 
-High-fidelity Next.js (App Router) + React + TypeScript implementation of the **BOSS Airtable** designs, backed by PostgreSQL.
-The designs are the source of truth; anything they do not specify is listed in
-[`NEEDS_CLARIFICATION.md`](./NEEDS_CLARIFICATION.md) rather than invented.
+Next.js 16 (App Router) + React 19 + TypeScript, backed by PostgreSQL. BOSS is our own replacement for the
+Airtable base: tables with typed fields, eight kinds of view, forms, a sidebar the team can organize, and
+records that are stored in the database (not in the browser).
 
 ## Run
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000  (opens on /sign-in)
-npm run build && npm start
-npm run lint       # tsc --noEmit
-npm test           # unit tests: accounting logic, table state, record forms (node:test via tsx)
-npm run db:migrate # create the PostgreSQL schema and seed an empty database
-npm run db:seed    # refresh the seed records explicitly
+cp .env.example .env                # set DATABASE_URL (PostgreSQL)
+npm run db:migrate                  # schema + definitions + one-time backfills; safe to run on every deploy
+npm run dev                         # http://localhost:3000
+npm run build && npm start          # `start` runs the migration first
+npm run lint                        # tsc --noEmit
+npm test                            # unit tests, plus PostgreSQL integration tests when DATABASE_URL is set
 ```
 
-To import CSV exports from Airtable without committing them to Git:
+`DATABASE_URL` is **required**: every table screen reads and writes PostgreSQL. Node 20+.
+The integration tests create and drop their own throwaway database, so the URL needs `CREATE DATABASE` rights.
+
+Browser end-to-end checks (Playwright for Python, Chromium):
 
 ```bash
-AIRTABLE_CSV_DIR=/path/to/exports \
-AIRTABLE_IMPORT_URL=https://your-app.example.com \
-API_WRITE_TOKEN=your-railway-secret \
-python3 scripts/import-airtable.py
+DATABASE_URL=postgresql://… sh qa/fresh-db.sh     # DROPS and recreates the database: test databases only
+sh qa/restart-app.sh                              # starts the production build on :3100
+BOSS_URL=http://localhost:3100 python3 qa/base-e2e.py
 ```
 
-Node 20+ recommended. Next 16, React 19, TypeScript, CSS Modules (no Tailwind), `lucide-react` icons,
-Inter via `@fontsource-variable/inter`. No Vite.
+The older `qa/interact.py`, `qa/e2e-browser.mjs` and the screenshot-diff scripts target the previous
+hand-built screens and are **not maintained**.
 
-## Routes
+## Tabs
 
-| Route | Screen |
-| --- | --- |
-| `/sign-in`, `/sign-up` | Auth (mock) |
-| `/profiles` … `/registries` | The 14 workspace tabs, one per `Screens/` image |
-| `/boss` | Marked placeholder (no design supplied) |
-| `/dev/cards` | Dev-only gallery of the 8 card/modal designs (404 in production) |
-| `/ais` | Accounting Information System (AIS) dashboard: the first tab of the tab bar (AIS, BOSS, Profiles, …) |
-| `/ais/accounts`, `/ais/general-ledger`, `/ais/journal-entries` | Chart of accounts, general ledger, journal entries |
-| `/ais/customers`, `/ais/invoices`, `/ais/accounts-receivable`, `/ais/payments` | Sales & receivables |
-| `/ais/vendors`, `/ais/bills`, `/ais/accounts-payable` | Purchases & payables |
-| `/ais/reports`, `/ais/settings` | Income statement, balance sheet, trial balance, aging; company / fiscal-year / numbering settings |
+Profiles · Categories · Folios · Actions · Vouchers · Transactions · Items · Forms · Concepts · Capabilities · Leads.
 
-## Architecture
+Removed on request: **BOSS, Packet, Accounts, Registries** (screens, seed data and images deleted; their rows in
+the database are untouched) and **AIS** (out of the navigation; its routes still exist but nothing links to them).
+
+## How it works
 
 ```
-src/
-  app/            routes: (auth) and (workspace)/[section]; server pages load data
-  components/
-    ui/           Button, Badge, Checkbox, Pagination, RowActions, AddRowButton, TextField
-    shell/        TopHeader, TabsBar, Sidebar
-    table/        DataTable (generic, grouped, themeable) + theme.ts
-    view/         Workspace (sidebar + title + toolbar + table + footer), ViewToolbar
-    popovers/     Popover + the eight cards (Sort, Hidden fields, Filter, Color, Share and sync, Share dialog, Group by, Profile menu)
-  views/          one client component per screen: columns, theme, sidebar and toolbar config
-  services/       server-side PostgreSQL data access (mock fallback without DATABASE_URL)
-  data/           mock data transcribed from the screens
-  types/          entity and RecordSet types
-  lib/            sections, badge tones, helpers
+src/lib/base/            shared engine: types, field metadata, filter/sort/group/search, validation,
+                         sidebar layout logic, view defaults, table definitions (definitions.ts)
+src/server/base/         store.ts (all database access), api.ts (routes), migrate.ts (idempotent migration)
+src/app/api/base/        HTTP entry point for the engine; api/files/:id serves uploaded attachments
+src/components/base/     TableApp (shell), TableProvider (state), Sidebar, Toolbar, RecordEditor, FieldEditor,
+                         views/ (Grid, Calendar, Gallery, Kanban, Timeline, List, Gantt, Form)
+src/components/base/{vouchers,items}/   Voucher QR + Bill of Lading, stock adjustment
+db/schema.sql            additive schema (existing tables are never altered or dropped)
 ```
 
-### Making the tables work
+Data model (all in the existing database):
 
-Every BOSS tab goes through the same `Workspace` + `DataTable`, so behaviour is implemented once:
+| Concept | Where | Notes |
+| --- | --- | --- |
+| Table | `boss_sections` (slug) | existing |
+| Record | `boss_records.data` (JSONB, keyed by field key) | existing; legacy keys are kept |
+| Field | `boss_fields` | type, options, required, primary. Renaming never changes the key |
+| View | `boss_views` | type + saved settings (filters, sort, grouping, hidden fields, widths, per-type settings) |
+| Section (folder) | `boss_nav_sections` | named group of views; deleting one only moves its views back to the sidebar |
+| Favorites | `boss_favorites` | per user; views and records |
+| Attachments | `boss_files` | bytes in PostgreSQL, served at `/api/files/:id` |
+| Autonumbers | `boss_counters` | race-safe |
+| One-time backfills | `boss_migrations` | so a backfill never runs twice |
 
-- **Search** – the header box filters the table of the current screen (`shell/SearchContext`); it clears when you change screen.
-- **Sort / Filter / Hide fields** – the toolbar cards are controlled by `Workspace`. Each view declares its fields once (`FieldDef` in `popovers/fields.tsx`: `key`, `column`, `type`, `form`); the same declaration drives sorting, filtering, column visibility and the record form. A field without a `key` is shown in the cards as designed but cannot be evaluated. The pure logic is in `table/tableState.ts`.
-- **Pagination, selection, empty / loading states** – real; the footer counts what is actually in the table.
-- **Records** – row click opens a drawer (view -> edit), `Create new …` / `Add row` open the create form, row icons edit / duplicate / delete (delete always asks, and offers Undo). Forms are generated from the view's `FieldDef`s (`records/RecordDrawer`).
-- **Persistence** – edits are stored as a small overlay in `localStorage` (`services/localRecords.ts`) on top of the server data. Writing through the existing `/api/records` routes instead only requires changing that file (those routes require a bearer token in production, so the browser cannot call them yet).
+Views of one table share the same records: changing a record in the Kanban shows in the Grid immediately, and
+each view's filters, sort, grouping, hidden fields, column widths and field choices (date field, cover, stack
+field, form fields…) are saved with the view. Locked views, and other people's personal views, can be used but
+not changed (changes apply for that visit only).
 
-### Accounting Information System (AIS)
+### What each view needs
 
-```
-src/app/(workspace)/ais/        routes + layout (AIS sidebar, books provider, record drawers)
-src/components/ais/             pages/ (one screen each), drawers/ (view / create / edit), AisList, AisPage, cells
-src/services/ais/               ledger.ts (posting, balances), validation.ts, mutations.ts (state transitions),
-                                reports.ts (statements, aging, dashboard), repository.ts (storage boundary)
-src/data/ais/seed.ts            one consistent set of sample books (Ray Land, Inc., Apr-Sep 2026)
-src/types/ais.ts                domain model (all amounts are integer cents)
-```
+| View | Needs | If missing |
+| --- | --- | --- |
+| Grid | – | – |
+| Calendar | a date field | the view offers to add one |
+| Gallery | optional attachment field for the cover | initials are shown |
+| Kanban | a single-select field | the view offers to add one |
+| Timeline / Gantt | a start date (end date optional) | the view offers to add one; Gantt dependencies use a link field to the same table |
+| List | – | – |
+| Form | editable fields | choose visible / required fields in the form settings |
 
-- **One source of truth:** invoices, bills and payments post journal entries through the same functions the UI uses, so the ledger, receivables, payables, reports and dashboard always agree. Reports and dashboard figures are derived from posted journal lines.
-- **Journal entries** must balance (total debits = total credits, exact cents) to be saved as a draft or posted. Posted entries are read-only and can be reversed.
-- **Storage boundary:** components call `AisProvider`, which calls pure functions in `mutations.ts` and persists through `AisRepository` (`load` / `save` / `reset`). The browser implementation is in `repository.ts`; an API implementation replaces it without touching the UI or the accounting logic.
-- **Reporting date:** the books carry a reporting date (30 Sep 2026 in the sample data, editable in Settings). Aging, overdue flags and "This month" are measured from it.
+### Field types
 
-**Data flow:** `[section]/page.tsx` (server) → `services/*` → PostgreSQL → `<XView data=… />` (client) → `Workspace` → `DataTable`.
-View definitions contain render functions, so they live in client components; only serialisable data crosses the boundary.
+Single-line text, long text, number (integer / decimal / currency / percent), date, checkbox, single select,
+multiple select, attachment, URL, email, phone, link to another record, autonumber, and a small whitelist of
+computed fields (voucher number offset, stock status, “folios in this category”). No expressions are evaluated.
 
-The backend stores Airtable-style records in `boss_sections`, `boss_groups`, and
-`boss_records`. This preserves each view's group metadata and lets the JSONB row
-payload evolve without a database migration every time an Airtable field changes.
-The `RecordSet<T>` return types remain the UI contract.
+### Relationships
 
-Complete read-only Airtable exports are mirrored separately in `airtable_tables`
-and `airtable_records`. This preserves every CSV column as JSONB while keeping the
-typed frontend contract stable. Source CSVs are intentionally excluded from Git.
+- **Folio → Assignee** links to a profile that is a **team member** (`Team` checked). Only team members are
+  offered; an existing link stays valid if the person later leaves the team.
+- **Folio → Category** links to a category record, so a new category is available in Folios immediately.
+- Deleting a profile or category clears the link in other records (the response says how many).
+- The previous text values (`cord`, `category`, `group`) are **kept in the record**; an unlinked Assignee or
+  Category still shows its old text, muted, until it is linked.
 
 ## API
 
+Browser API (same-origin, session cookie), all under `/api/base`:
+
 | Route | Purpose |
 | --- | --- |
-| `GET /api/health` | Database health check |
-| `GET /api/records/:section` | Read a complete grouped record set |
-| `POST /api/records/:section` | Create a row (`groupId` + `data`) |
-| `PATCH /api/records/:section/:id` | Update row fields |
-| `DELETE /api/records/:section/:id` | Delete a row |
-| `GET /api/airtable` | List imported Airtable tables |
-| `GET /api/airtable/:table` | Read a paginated raw table mirror |
-| `POST /api/airtable/:table` | Atomically replace a raw table mirror |
+| `GET /tables/:t` | fields, records, views, sections, this user's favorites, linked records |
+| `POST /tables/:t/records`, `PATCH\|DELETE …/records/:id`, `POST …/records/delete` | records |
+| `POST\|PATCH\|DELETE /tables/:t/fields[/:key]` | fields |
+| `POST\|PATCH\|DELETE /tables/:t/views[/:id]`, `POST …/views/:id/duplicate`, `POST …/views/:id/submit` | views and form submission |
+| `POST\|PATCH\|DELETE /tables/:t/sections[/:id]`, `PUT /tables/:t/layout` | sidebar sections and ordering |
+| `PUT /tables/:t/favorites` | add / remove a favorite |
+| `POST /files` | upload (images, PDF, text, Word, Excel; ≤ 5 MB; content is checked against its type) |
 
-Mutations and all raw Airtable mirror routes require
-`Authorization: Bearer $API_WRITE_TOKEN` in production.
+The older token-protected `/api/records/*` and `/api/airtable/*` routes (used by `scripts/import-airtable.py`)
+are unchanged.
 
-**Design fidelity rules followed:** Flexbox/Grid layout (no absolute positioning for layout), shared tokens in
-`globals.css`, per-screen table themes in each view, popovers close on Esc / outside press. Controls whose behaviour is still not designed (see `NEEDS_CLARIFICATION.md`) stay inert or say so.
+## Security notes — read before going live
 
-## QA
+- **There is no real authentication.** Sign-in and sign-up remain the original mock screens. For favorites and
+  personal views the browser receives an anonymous id in an httpOnly cookie. Writes also require a same-origin
+  request, which stops cross-site requests but **does not stop anyone who can reach the site**. Put real
+  authentication in front of the app (or replace `userId` in `src/server/base/api.ts` with your session user)
+  before exposing it.
+- Uploaded files are never served as HTML or SVG, are sent with `nosniff` and a locked-down CSP, and are
+  limited to an allow-list of types.
+- All record input is validated on the server (types, required, options, uniqueness, links); the browser only
+  mirrors those rules for faster feedback.
 
-`npm test` runs the unit tests (accounting logic, table state, record forms). `qa/e2e-browser.mjs` is a browser
-end-to-end script for the interactions and the AIS flows (see its header for how to run it).
+## Environment
 
-`qa/` contains the Playwright scripts used to verify the build (Python, Playwright, Pillow, numpy):
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection (Railway injects it) |
+| `API_WRITE_TOKEN` | bearer token for scripts calling `/api/records` and `/api/base` writes |
+| `PGSSLMODE=require` | for providers whose public endpoint needs TLS |
+| `PG_POOL_MAX` | pool size (default 10) |
 
-```bash
-BOSS_URL=http://localhost:3000 python3 qa/interact.py          # 71 interaction checks
-BOSS_REF_DIR="/path/to/BOSS Airtable" python3 qa/shoot.py       # screenshot every route and diff against Screens/
-BOSS_REF_DIR="/path/to/BOSS Airtable" python3 qa/audit.py 06 2  # per-column colour / position audit vs the reference
-```
+## Migrations
 
-Visual mismatch (share of pixels differing by more than a small threshold, at 1440x900 @2x) at hand-off:
-sign-in 0.9%, sign-up 1.2%, Leads 3.9%, Accounts 3.7%, Registries 3.3%, Vouchers 4.8%, Forms 4.8%, Profiles 4.9%,
-Items 5.8%, Actions 6.0%, Packet 6.4%, Transactions 6.5%, Folios 6.9%, Categories 7.4%, Concepts 7.7%,
-Capabilities 10.9%. Most of the remainder is text antialiasing and the clipped or placeholder artwork described in
-`NEEDS_CLARIFICATION.md`; Capabilities and Concepts are the least refined screens.
+`npm run db:migrate` (also run by `npm start`) applies `db/schema.sql`, seeds an **empty** database, then applies
+field/view definitions and backfills. It is idempotent and non-destructive: definitions are only inserted when
+missing, user edits are never overwritten, and nothing is deleted. Sample content (capabilities, inventory
+details, voucher details) is added to **fresh databases only**.
+
+## Tests
+
+| Suite | What it covers |
+| --- | --- |
+| `src/lib/base/base.test.ts` | filters, sorting, grouping, search, computed fields, validation, view defaults, sidebar move / reorder logic |
+| `src/server/base/api.test.ts` | real PostgreSQL: migrations, CRUD, validation, uniqueness, link integrity, permissions, layout, favorites, forms, uploads |
+| original suites | AIS accounting logic, table state, record forms |
+| `qa/base-e2e.py` | browser: navigation, all view types, create / rename / duplicate / delete, sections and drag-and-drop, favorites, inline editing, fields, forms, Team Profile, Folio, Voucher, Items, Capabilities |
+
+See `NEEDS_CLARIFICATION.md` for assumptions and open questions.

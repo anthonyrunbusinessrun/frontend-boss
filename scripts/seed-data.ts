@@ -1,6 +1,5 @@
 import type { Pool, PoolClient } from "pg";
 import type { RecordSet } from "../src/types";
-import { accounts } from "../src/data/accounts";
 import { actions } from "../src/data/actions";
 import { capabilities } from "../src/data/capabilities";
 import { categories } from "../src/data/categories";
@@ -9,9 +8,7 @@ import { folios } from "../src/data/folios";
 import { forms } from "../src/data/forms";
 import { items } from "../src/data/items";
 import { leads } from "../src/data/leads";
-import { packet } from "../src/data/packet";
 import { profiles } from "../src/data/profiles";
-import { registries } from "../src/data/registries";
 import { transactions } from "../src/data/transactions";
 import { vouchers } from "../src/data/vouchers";
 
@@ -22,16 +19,13 @@ const sections: Array<{ slug: string; name: string; data: RecordSet<SeedRow> }> 
   { slug: "categories", name: "Categories", data: categories as RecordSet<SeedRow> },
   { slug: "folios", name: "Folios", data: folios as RecordSet<SeedRow> },
   { slug: "actions", name: "Actions", data: actions as RecordSet<SeedRow> },
-  { slug: "packet", name: "Packet", data: packet as RecordSet<SeedRow> },
   { slug: "vouchers", name: "Vouchers", data: vouchers as RecordSet<SeedRow> },
   { slug: "transactions", name: "Transactions", data: transactions as RecordSet<SeedRow> },
   { slug: "items", name: "Items", data: items as RecordSet<SeedRow> },
-  { slug: "accounts", name: "Accounts", data: accounts as RecordSet<SeedRow> },
   { slug: "forms", name: "Forms", data: forms as RecordSet<SeedRow> },
   { slug: "concepts", name: "Concepts", data: concepts as RecordSet<SeedRow> },
   { slug: "capabilities", name: "Capabilities", data: capabilities as RecordSet<SeedRow> },
   { slug: "leads", name: "Leads", data: leads as RecordSet<SeedRow> },
-  { slug: "registries", name: "Registries", data: registries as RecordSet<SeedRow> },
 ];
 
 async function seedSection(client: PoolClient, section: (typeof sections)[number]) {

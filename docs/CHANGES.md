@@ -1,0 +1,51 @@
+# BOSS update: what changed
+
+## Completed
+- **Navigation:** BOSS, Packet, Accounts, Registries removed (screens, seed data, images; database rows untouched). AIS removed from the
+  navigation (routes remain). Remaining tabs: Profiles, Categories, Folios, Actions, Vouchers, Transactions, Items, Forms, Concepts,
+  Capabilities, Leads.
+- **Table engine:** typed fields, eight view types (Grid, Calendar, Gallery, Kanban, Timeline, List, Gantt, Form) sharing one set of
+  records; view settings saved per view; create / rename / duplicate / delete views; Collaborative / Personal / Locked.
+- **Create button:** one “Create new…” menu on every table: Grid, Calendar, Gallery, Kanban, Timeline, List, Gantt, Form, Section.
+- **Sidebar:** favorites (views and records), sections, drag-and-drop to reorder and move, keyboard “Move to…”, search, persistence.
+- **Header actions + modals:** contextual buttons per table opening validated create / edit forms and tools.
+- **Team Profile:** Profiles section with grid, gallery directory (profile pictures) and onboarding form; Team flag; unique contact / email.
+- **Categories:** Group column and input removed.  **Folios:** Cord renamed Assignee (searchable team-member link); Category is a link
+  dropdown fed by Categories; unlinking on delete.
+- **Vouchers:** Infant & Toddler layout (I, No, VSF, Manifest, QR), QR generator, Bill of Lading preview + print.
+- **Items:** SKU, unit, category, reorder level, stock status, adjust-stock action, validation, search, low-stock view.
+- **Capabilities:** System / Exception / All areas with counts, backed by an Area field.
+- **Backend:** all reads and writes go through `/api/base` to PostgreSQL; server-side validation, uniqueness, link integrity, view
+  permissions, uploads. Edits are no longer kept in `localStorage`.
+
+## Database
+New tables (additive): `boss_fields`, `boss_views`, `boss_nav_sections`, `boss_favorites`, `boss_files`, `boss_counters`,
+`boss_migrations`. Existing tables are unchanged. One-time backfills (recorded in `boss_migrations`): profiles flagged Team / not
+inactive; folios linked to profiles and categories from the old `cord` / `category` text (old text kept); voucher and item autonumbers.
+
+## Files
+- **Added:** `src/lib/base/*`, `src/server/base/*`, `src/components/base/**`, `src/app/api/base/[...path]`, `src/app/api/files/[id]`,
+  `qa/base-e2e.py`, `qa/fresh-db.sh`, `qa/restart-app.sh`, `docs/CHANGES.md`.
+- **Changed:** `db/schema.sql`, `scripts/migrate.ts`, `scripts/seed-data.ts`, `src/app/(workspace)/[section]/page.tsx`,
+  `src/lib/sections.ts`, `src/lib/db.ts` (pool error handler), `src/components/ui/Dialog.tsx` (Escape handling), `src/app/globals.css`
+  (print), `src/server/records.ts`, `src/services/index.ts`, `src/types/index.ts`, `package.json`, `README.md`, `NEEDS_CLARIFICATION.md`,
+  `.gitignore`.
+- **Deleted:** `src/views/*` (all legacy per-tab screens), `src/data/{packet,accounts,registries}.ts`, `public/assets/registries/*`.
+- **Dependencies added:** `qrcode`, `@types/qrcode`.
+
+## Setup
+1. Set `DATABASE_URL` (and `API_WRITE_TOKEN` for scripts / production writes via token). 2. `npm install`. 3. `npm run db:migrate`
+(also run by `npm start`). 4. `npm run build && npm start`. The database user needs `CREATE DATABASE` only to run the integration tests.
+
+## Results of the checks that were run (final state)
+| Command | Result |
+| --- | --- |
+| `npm run lint` | passes |
+| `npm test` | 99 / 99 pass (33 original, 39 engine unit, 27 PostgreSQL integration) |
+| `npm run build` | passes |
+| `python3 qa/base-e2e.py` (browser, 67 checks, fresh database) | 67 / 67 on the last two full runs |
+
+## Not done / to confirm
+See `NEEDS_CLARIFICATION.md`. Main points: **no real authentication** (anonymous cookie user only); phone layouts not tuned;
+one intermittent browser-test failure was seen once and not reproduced (likely a test timing race, tests were hardened);
+drag-and-drop was exercised with Playwright's synthetic drags only; Airtable CSV import is not yet mapped onto the new fields.
