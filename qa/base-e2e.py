@@ -6,7 +6,7 @@ Browser end-to-end checks for the table engine (Playwright, Python).
 Needs a running app on a migrated database. The script creates its own uniquely named views, sections,
 records and categories, so it can be re-run against the same database.
 """
-import io, os, sys, time, traceback
+import io, os, re, sys, time, traceback
 from playwright.sync_api import sync_playwright, expect
 
 BASE = os.environ.get("BOSS_URL", "http://localhost:3100")
@@ -50,8 +50,59 @@ def go(path):
     page.wait_for_selector("aside[aria-label=Views]")
     page.wait_for_timeout(500)
 
+def formbtn(name):
+    """Sidebar button of a Form view: its accessible name ends with the category tag (Work / Vouchers)."""
+    return sidebar().get_by_role("button", name=re.compile("^" + re.escape(name) + "( (Work|Vouchers))?$"))
+
 def secbtn(name):
     return sidebar().locator("button[aria-expanded]", has_text=name)
+
+import re
+
+def filter_panel():
+    return page.locator("[role=dialog][data-floating-level='0']").last
+
+def open_filter():
+    if not filter_panel().is_visible() if page.locator("[role=dialog][data-floating-level='0']").count() else True:
+        page.get_by_role("button", name=re.compile(r"^(Filter|Filtered by)")).first.click()
+        page.wait_for_selector("[role=dialog][data-floating-level='0']")
+
+def pick_option(name):
+    """Choose an option in the topmost searchable list."""
+    page.locator("[role=dialog][data-floating-level='1']").last.get_by_role("option", name=name, exact=True).click()
+
+def add_condition(field, op=None, value=None, values=None, between=None):
+    """Add one filter condition through the UI. value=("pick","Queue") or ("text","abc"); values=[...] for any-of / none-of."""
+    open_filter()
+    fp = filter_panel()
+    fp.get_by_role("button", name="Add condition").click()
+    page.wait_for_timeout(150)
+    fp.get_by_role("button", name=re.compile(r"^Field:")).last.click()
+    pick_option(field)
+    if op:
+        fp.get_by_role("button", name=re.compile(r"^Operator:")).last.click()
+        pick_option(op)
+    if value:
+        kind, v = value
+        if kind == "pick":
+            fp.get_by_role("button", name=re.compile(r"^Value for")).last.click(); pick_option(v)
+        elif kind == "select":
+            fp.get_by_label("Value").last.select_option(v)
+        else:
+            fp.get_by_label("Value").last.fill(v)
+    if values:
+        fp.get_by_role("button", name=re.compile(r"^Values for")).last.click()
+        for v in values: page.locator("[role=dialog][data-floating-level='1']").last.get_by_label(v, exact=True).check()
+        page.keyboard.press("Escape")
+    if between:
+        lo, hi = between
+        fp.get_by_label(re.compile(r"^(Minimum|From date)")).last.fill(lo)
+        fp.get_by_label(re.compile(r"^(Maximum|To date)")).last.fill(hi)
+    page.wait_for_timeout(250)
+
+def close_panels():
+    for _ in range(3):
+        if page.locator("[role=dialog][data-floating-level]").count(): page.keyboard.press("Escape"); page.wait_for_timeout(150)
 
 def open_grid(name="All Actions"):
     sidebar().get_by_role("button", name=name, exact=True).click()
@@ -103,7 +154,7 @@ with sync_playwright() as p:
     go("/actions")
     def create_menu():
         sidebar().get_by_role("button", name="Create new…", exact=True).click()
-        names = [i.inner_text().strip() for i in page.get_by_role("menuitem").all()]
+        names = [i.get_attribute("aria-label") for i in page.get_by_role("menuitem").all()]
         assert names == ["Grid", "Calendar", "Gallery", "Kanban", "Timeline", "List", "Gantt", "Form", "Section"], names
         page.keyboard.press("Escape")
     check("create menu offers Grid, Calendar, Gallery, Kanban, Timeline, List, Gantt, Form, Section", create_menu)
@@ -154,7 +205,8 @@ with sync_playwright() as p:
     def persists():
         page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
         for k, n in names.items():
-            assert sidebar().get_by_role("button", name=n, exact=True).count() == 1, n
+            btn = formbtn(n) if k == "Form" else sidebar().get_by_role("button", name=n, exact=True)
+            assert btn.count() == 1, n
     check("created views survive a page refresh", persists)
 
     def switch_keeps_records():
@@ -210,10 +262,12 @@ with sync_playwright() as p:
         cell.hover(); cell.get_by_role("button", name="Add record on 2026-07-22").click()
         dlg = page.get_by_role("dialog")
         assert dlg.get_by_label("Accrue").input_value() == "2026-07-22"
-        dlg.get_by_label("Code").fill(f"A-E{RUN}"); dlg.get_by_label("Title").fill(f"E2E cal action {RUN}")
+        expect(dlg.get_by_test_id("code-code")).to_have_value(re.compile(r"^A-\d+$"))
+        code = dlg.get_by_test_id("code-code").input_value()
+        dlg.get_by_label("Title").fill(f"E2E cal action {RUN}")
         dlg.get_by_label("Type").select_option("Notice"); dlg.get_by_label("Status").select_option("Queue")
         dlg.get_by_role("button", name="Create action").click()
-        expect(page.get_by_text(f"A-E{RUN}").first).to_be_visible()
+        expect(page.get_by_text(code).first).to_be_visible()
     check("calendar: creating a record on a day pre-fills the date and saves", calendar_create)
 
     # --------------------------------------------------------------- gantt + dependencies
@@ -301,7 +355,7 @@ with sync_playwright() as p:
     check("drag a view into a section; the structure persists after refresh", drag_into_section)
 
     def reorder_root():
-        a = sidebar().locator("li[draggable=true]", has=page.get_by_role("button", name=names["Form"], exact=True))
+        a = sidebar().locator("li[draggable=true]", has=page.get_by_role("button", name=re.compile("^" + re.escape(names["Form"]))))
         b = sidebar().locator("li[draggable=true]", has=page.get_by_role("button", name="All Actions", exact=True))
         before = [x.inner_text() for x in sidebar().locator("ul > li > button.sideBtn, nav > ul > li").all()]
         a.drag_to(b, target_position={"x": 40, "y": 3}); page.wait_for_timeout(900)
@@ -408,18 +462,13 @@ with sync_playwright() as p:
         assert "Validate Sourcing Schema" in first or "Update Onboarding" in first or "Review" not in first, first
         page.get_by_role("button", name="Sorted by 1 field").click()
         page.get_by_role("button", name="Remove Title").click(); page.keyboard.press("Escape")
-        page.get_by_role("button", name="Filter", exact=True).click()
-        pnl = page.locator("[role=dialog]").last
-        pnl.get_by_role("button", name="Add condition").click()
-        pnl.get_by_label("Field").select_option(label="Status")
-        pnl.get_by_label("Value").select_option("Queue")
+        add_condition("Status", value=("pick", "Queue"))
         page.keyboard.press("Escape")
-        expect(page.locator("p", has_text="of 17").first).to_be_visible()
+        expect(page.locator("p", has_text=re.compile(r"\d+ of \d+ actions")).first).to_be_visible()
         n = page.get_by_role("row").filter(has_text="Queue").count()
         assert n >= 5
-        page.get_by_role("button", name=lambda s: s.startswith("Filtered by") if callable(s) else False) if False else None
-        page.locator("button", has_text="Filtered by Status").click()
-        page.locator("[role=dialog]").last.get_by_role("button", name="Clear all").click(); page.keyboard.press("Escape")
+        expect(page.get_by_role("status", name="Active filters")).to_contain_text("Status is Queue")
+        page.get_by_role("button", name="Clear all filters").click()
         page.get_by_role("button", name="Group", exact=True).click()
         page.locator("[role=dialog]").last.get_by_role("button", name="Pick a field to group by").click()
         page.keyboard.press("Escape")
@@ -474,7 +523,7 @@ with sync_playwright() as p:
         dlg = page.get_by_role("dialog")
         dlg.get_by_role("button", name="Create action").click()
         expect(dlg.get_by_role("alert").first).to_be_visible()  # validation, nothing saved
-        dlg.get_by_label("Code").fill(f"A-R{RUN}"); dlg.get_by_label("Title").fill(f"E2E record {RUN}")
+        dlg.get_by_label("Title").fill(f"E2E record {RUN}")
         dlg.get_by_label("Accrue").fill("2026-11-02"); dlg.get_by_label("Type").select_option("Tasking"); dlg.get_by_label("Status").select_option("Queue")
         dlg.get_by_role("button", name="Create action").click()
         expect(page.get_by_role("dialog").last).to_contain_text(f"E2E record {RUN}")
@@ -533,7 +582,7 @@ with sync_playwright() as p:
     check("Team Profile: member appears in the grid and in the Directory gallery with the photo", team_views)
 
     def onboarding_form():
-        sidebar().get_by_role("button", name="New Team Onboarding Form", exact=True).click()
+        formbtn("New Team Onboarding Form").click()
         form = page.get_by_role("region", name="Form")
         form.get_by_role("button", name="New team member") if False else None
         form.get_by_label("Name").fill(f"Form Person {RUN}"); form.get_by_label("Contact").fill(f"F{RUN[-3:]}")
@@ -549,13 +598,13 @@ with sync_playwright() as p:
     check("Form view: required fields enforced; a submission creates a real record", onboarding_form)
 
     def form_builder():
-        sidebar().get_by_role("button", name="New Team Onboarding Form", exact=True).click()
+        formbtn("New Team Onboarding Form").click()
         aside = page.get_by_role("complementary", name="Form settings")
         aside.get_by_label("Required").nth(4).count()
         cb = aside.get_by_role("checkbox", name="Required").first
         cb.check(); page.wait_for_timeout(900)
         page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
-        sidebar().get_by_role("button", name="New Team Onboarding Form", exact=True).click()
+        formbtn("New Team Onboarding Form").click()
         assert page.get_by_role("complementary", name="Form settings").get_by_role("checkbox", name="Required").first.is_checked()
     check("Form view: visible/required settings are saved", form_builder)
 
@@ -635,37 +684,29 @@ with sync_playwright() as p:
         go("/vouchers")
         expect(page.get_by_role("complementary", name="Voucher tools")).to_be_visible()
         heads = [h.inner_text().strip() for h in page.get_by_role("columnheader").all()]
-        assert heads[:6] == ["", "", "I", "No", "VSF", "Manifest"] or ["I", "No", "VSF", "Manifest", "QR"] == [h for h in heads if h][:5], heads
+        assert [h for h in heads if h][:5] == ["I", "No", "VSF", "Manifest", "QR"], heads
         assert "VOUCHERS | Simplified" in page.locator("h1").inner_text()
         panel = page.get_by_role("complementary", name="Voucher tools")
-        expect(panel.locator("[aria-label^='Bill of Lading LLG-BL-']")).to_be_visible()
-        expect(panel).to_contain_text("MANIFEST OF ORDER")
-        panel.get_by_role("button", name=lambda n: False) if False else None
-        panel.get_by_role("button", name="Run (2 to generate)").click() if panel.get_by_role("button", name="Run (2 to generate)").count() else panel.get_by_role("button", name="Run", exact=False).first.click()
-        expect(page.get_by_text("Generated").first).to_be_visible()
+        expect(panel).to_contain_text("Original PDF")
+        expect(panel.locator("[data-testid=pdf-preview][data-state=ready]")).to_be_visible()
+        panel.get_by_role("button", name=re.compile("^Run")).click()
+        expect(page.get_by_text("Generated 2 QR codes").first).to_be_visible()
         page.wait_for_timeout(500)
-        assert page.get_by_role("row").nth(1).locator("img").count() >= 1
+        assert page.get_by_role("grid").get_by_role("row").nth(1).locator("img").count() >= 1
         expect(panel.get_by_role("button", name="Run (all up to date)")).to_be_visible()
-    check("Vouchers: reference layout (I, No, VSF, Manifest, QR), Bill of Lading preview, QR generator", vouchers)
+    check("Vouchers: reference layout (I, No, VSF, Manifest, QR), PDF preview, QR generator", vouchers)
 
     def voucher_create_autonumber():
         n0 = page.get_by_role("grid").get_by_role("row").count()
         page.get_by_role("button", name="New voucher").click()
         dlg = page.get_by_role("dialog")
-        dlg.get_by_label("Manifest").fill(f"P/U - E2E {RUN}\nPallet of wipes"); dlg.get_by_label("VSF").select_option("VSF")
+        dlg.get_by_label("Manifest", exact=True).fill(f"P/U - E2E {RUN}\nPallet of wipes"); dlg.get_by_label("VSF").select_option("VSF")
         assert dlg.get_by_label("I", exact=True).count() == 0  # autonumber is not typed in
         dlg.get_by_role("button", name="Create voucher").click()
         expect(page.get_by_role("dialog").last).to_contain_text("12")
         page.keyboard.press("Escape")
         assert page.get_by_role("grid").get_by_role("row").count() == n0 + 1
     check("Vouchers: create a voucher; I is assigned automatically and No = I + 1000", voucher_create_autonumber)
-
-    def voucher_print_css():
-        page.emulate_media(media="print")
-        vis = page.locator("[data-print-area]").first
-        assert vis.is_visible()
-        page.emulate_media(media="screen")
-    check("Vouchers: the Bill of Lading has a print layout", voucher_print_css)
 
     def voucher_deeplink():
         rec = page.evaluate("fetch('/api/base/tables/vouchers').then(r=>r.json()).then(b=>b.records[0].id)")

@@ -1,4 +1,4 @@
-import { isEditableType, primaryField } from "./fields";
+import { isEditableType, isUserEditable, primaryField } from "./fields";
 import type { FieldDef, FormConfig, FormFieldConfig, ViewConfig, ViewType } from "./types";
 import { emptyViewConfig } from "./types";
 
@@ -27,9 +27,10 @@ export const viewTypeLabel = (t: ViewType) => VIEW_TYPE_INFO.find((v) => v.type 
 const ofType = (fields: FieldDef[], ...types: FieldDef["type"][]) => fields.filter((f) => types.includes(f.type));
 
 export function defaultFormConfig(fields: FieldDef[], tableName: string): FormConfig {
-  const editable = fields.filter((f) => isEditableType(f.type));
+  const editable = fields.filter((f) => isUserEditable(f, "create"));
   const cfg: FormFieldConfig[] = editable.map((f) => ({ key: f.key, visible: true, required: f.required }));
   return {
+    category: "Work",
     title: `New ${tableName.replace(/s$/i, "").toLowerCase()}`,
     description: "",
     submitLabel: "Submit",
@@ -124,7 +125,7 @@ export function pruneConfig(cfg: ViewConfig, fields: FieldDef[]): ViewConfig {
 
 /** Make sure every editable field appears in a form config (new fields are added hidden-off by default = visible). */
 export function syncFormConfig(form: FormConfig, fields: FieldDef[]): FormConfig {
-  const editable = fields.filter((f) => isEditableType(f.type));
+  const editable = fields.filter((f) => isUserEditable(f, "create"));
   const known = new Set(form.fields.map((f) => f.key));
   const added = editable.filter((f) => !known.has(f.key)).map((f): FormFieldConfig => ({ key: f.key, visible: false, required: f.required }));
   const valid = new Set(editable.map((f) => f.key));

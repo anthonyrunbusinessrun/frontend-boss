@@ -1,20 +1,21 @@
 "use client";
 
 import { Copy, Pencil, Star, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog, Drawer } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { displayText } from "@/lib/base/compute";
-import { isEditableType, primaryField, readAttachments } from "@/lib/base/fields";
+import { isUserEditable, primaryField, readAttachments } from "@/lib/base/fields";
 import { tableSeed } from "@/lib/base/definitions";
 import { hasErrors, validateRecordInput } from "@/lib/base/validate";
 import type { RecordRow } from "@/lib/base/types";
-import { ClientError } from "./client";
+import { api, ClientError } from "./client";
 import { CellValue } from "./cells";
 import { FieldInput, FieldRow } from "./inputs";
 import { messageOf, useTable } from "./TableProvider";
 import s from "./base.module.css";
+import { cn } from "@/lib/cn";
 import { Avatar } from "./ui";
 
 export type EditorState = {
@@ -36,12 +37,28 @@ export function RecordEditor({ state, onChange, onClose, onSaved, renderExtra }:
   const record = state.recordId ? t.records.find((r) => r.id === state.recordId) : undefined;
   const primary = primaryField(t.fields);
 
-  const editable = useMemo(() => t.fields.filter((f) => isEditableType(f.type) && (!state.fieldKeys || state.fieldKeys.includes(f.key))), [t.fields, state.fieldKeys]);
+  const formMode = state.mode === "create" ? "create" : "update";
+  const editable = useMemo(() => t.fields.filter((f) => isUserEditable(f, formMode) && (!state.fieldKeys || state.fieldKeys.includes(f.key))), [t.fields, state.fieldKeys, formMode]);
+  /** Fields whose value the server generates (the Code). Shown read-only at the top of the form. */
+  const codeFields = useMemo(() => t.fields.filter((f) => f.options.sequence && (!state.fieldKeys || state.fieldKeys.includes(f.key))), [t.fields, state.fieldKeys]);
   const initial = useMemo<Record<string, unknown>>(() => {
     const base: Record<string, unknown> = {};
-    for (const f of editable) base[f.key] = record ? record[f.key] : state.preset?.[f.key] ?? (f.type === "checkbox" ? false : f.type === "multiSelect" || f.type === "attachment" ? [] : null);
+    for (const f of editable) base[f.key] = record ? record[f.key] : state.preset?.[f.key] ?? f.options.defaultValue ?? (f.type === "checkbox" ? false : f.type === "multiSelect" || f.type === "attachment" ? [] : null);
     return base;
   }, [editable, record, state.preset]);
+
+  // The code the next record would get, shown straight away. The server still assigns the real one when saving.
+  const [nextCodes, setNextCodes] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (state.mode !== "create") return;
+    let alive = true;
+    for (const f of codeFields) {
+      api.nextCode(t.slug, f.key).then((r) => alive && setNextCodes((c) => ({ ...c, [f.key]: r.value }))).catch(() => undefined);
+    }
+    return () => {
+      alive = false;
+    };
+  }, [state.mode, codeFields, t.slug]);
 
   const [values, setValues] = useState<Record<string, unknown>>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -70,7 +87,9 @@ export function RecordEditor({ state, onChange, onClose, onSaved, renderExtra }:
     setErrors({});
     try {
       const saved = state.mode === "create" ? await t.createRecord(check.values) : await t.updateRecord(state.recordId!, check.values);
-      toast.success(`${cap(singular)} “${primary ? displayText(primary, saved, t.linked) || "saved" : "saved"}” ${state.mode === "create" ? "created" : "updated"}.`);
+      const label = primary ? displayText(primary, saved, t.linked) || "saved" : "saved";
+      const taken = state.mode === "create" ? codeFields.find((f) => nextCodes[f.key] && saved[f.key] !== nextCodes[f.key]) : undefined;
+      toast.success(taken ? `${cap(singular)} “${label}” created. The number ${nextCodes[taken.key]} had just been taken, so it received ${String(saved[taken.key])}.` : `${cap(singular)} “${label}” ${state.mode === "create" ? "created" : "updated"}.`);
       onSaved?.(saved);
       onChange({ mode: "view", recordId: saved.id });
     } catch (e) {
@@ -99,7 +118,7 @@ export function RecordEditor({ state, onChange, onClose, onSaved, renderExtra }:
   const duplicate = () => {
     if (!record) return;
     const preset: Record<string, unknown> = {};
-    for (const f of t.fields) if (isEditableType(f.type) && !f.options.unique) preset[f.key] = record[f.key];
+    for (const f of t.fields) if (isUserEditable(f, "create") && !f.options.unique && f.options.managed === undefined) preset[f.key] = record[f.key];
     onChange({ mode: "create", preset, title: `Copy of ${label ?? singular}` });
   };
 
@@ -180,6 +199,17 @@ export function RecordEditor({ state, onChange, onClose, onSaved, renderExtra }:
                 Some fields need attention.
               </p>
             )}
+            {codeFields.map((f) => {
+              const id = `rec-${f.key}`;
+              const value = state.mode === "create" ? (nextCodes[f.key] ?? "") : String(record?.[f.key] ?? "");
+              return (
+                <div key={f.key} className={cn(s.fieldRow, s.fieldWide)}>
+                  <label htmlFor={id} className={s.fieldLabel}>{f.name}</label>
+                  <input id={id} className={cn(s.input, s.codeInput)} value={state.mode === "create" && !value ? "Assigning…" : value} readOnly aria-readonly="true" data-testid={`code-${f.key}`} />
+                  <p className={s.fieldHint}>{state.mode === "create" ? "Assigned automatically when you save: the next number after the highest existing one." : "Assigned when the record was created. It never changes."}</p>
+                </div>
+              );
+            })}
             {editable.map((f, i) => {
               const id = `rec-${f.key}`;
               return (

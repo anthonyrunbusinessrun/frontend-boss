@@ -6,12 +6,13 @@ import { useGlobalSearch } from "@/components/shell/SearchContext";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { tableSeed } from "@/lib/base/definitions";
-import { queryRecords } from "@/lib/base/query";
+import { activeFilterCount, queryRecords } from "@/lib/base/query";
 import type { FieldType, TableBundle } from "@/lib/base/types";
 import { viewTypeLabel } from "@/lib/base/viewDefaults";
 import { cn } from "@/lib/cn";
 import { AdjustStockModal } from "./items/AdjustStockModal";
 import { FieldEditor } from "./FieldEditor";
+import { ActiveFilters } from "./FilterPanel";
 import { RecordEditor, type EditorState } from "./RecordEditor";
 import { Sidebar } from "./Sidebar";
 import { TableProvider, useTable } from "./TableProvider";
@@ -65,8 +66,21 @@ function Workspace({ initialRecordId }: { initialRecordId?: string }) {
     }
   }, [editor?.recordId, editor?.mode]);
 
-  const rows = useMemo(() => queryRecords(t.records, t.config, t.fields, query, t.linked), [t.records, t.config, t.fields, query, t.linked]);
-  const filtered = rows.length !== t.records.length;
+  // Large tables: the server filters, searches and sorts; this page only asks again when those settings change.
+  const { serverMode, queryServer } = t;
+  const serverKey = JSON.stringify([t.config.filters, t.config.sort, query]);
+  useEffect(() => {
+    if (!serverMode || t.view.type === "form") return;
+    const timer = setTimeout(() => void queryServer({ filters: t.config.filters, sort: t.config.sort, search: query }), 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverMode, serverKey, t.view.id]);
+
+  const rows = useMemo(() => (serverMode ? t.records : queryRecords(t.records, t.config, t.fields, query, t.linked)), [serverMode, t.records, t.config, t.fields, query, t.linked]);
+  const totalRecords = serverMode ? t.recordCount : t.records.length;
+  const matching = serverMode ? t.serverTotal : rows.length;
+  const filtered = matching !== totalRecords;
+  const filtersActive = activeFilterCount(t.config.filters, t.fields) > 0;
 
   const open = useCallback((id: string) => setEditor({ mode: "view", recordId: id }), []);
   const create = useCallback((preset?: Record<string, unknown>) => setEditor({ mode: "create", preset }), []);
@@ -84,17 +98,17 @@ function Workspace({ initialRecordId }: { initialRecordId?: string }) {
     if (t.loading) return <div className={s.loading}><Spinner /> Loading…</div>;
     const type = t.view.type;
     if (type === "form") return <FormView />;
-    if (t.records.length === 0 && type !== "grid")
+    if (totalRecords === 0 && type !== "grid")
       return (
         <EmptyState icon={<Table2 size={22} />} title={`No ${t.tableName.toLowerCase()} yet`} description={`Create your first ${singular} to see it in this ${viewTypeLabel(type).toLowerCase()} view.`}>
           <Button size="md" icon={<Plus size={14} />} onClick={() => create()}>New {singular}</Button>
         </EmptyState>
       );
-    if (rows.length === 0 && t.records.length > 0 && type !== "grid")
+    if (rows.length === 0 && totalRecords > 0 && !t.serverLoading)
       return (
-        <EmptyState icon={<SearchX size={22} />} title={`No ${t.tableName.toLowerCase()} match`} description="Try a different search, or remove a filter to see more records.">
+        <EmptyState icon={<SearchX size={22} />} title={`No ${t.tableName.toLowerCase()} match`} description={filtersActive && query.trim() ? "No records match your search and the filters on this view." : filtersActive ? "No records match the filters on this view. Your records are untouched." : "No records match your search."}>
           {query.trim() && <Button variant="secondary" size="md" onClick={() => setQuery("")}>Clear search</Button>}
-          {t.config.filters.length > 0 && <Button variant="secondary" size="md" onClick={() => t.patchConfig({ filters: [] })}>Clear filters</Button>}
+          {filtersActive && <Button variant="secondary" size="md" onClick={() => t.patchConfig({ filters: [] })}>Clear all filters</Button>}
         </EmptyState>
       );
     switch (type) {
@@ -120,7 +134,7 @@ function Workspace({ initialRecordId }: { initialRecordId?: string }) {
               <ViewIcon type={t.view.type} size={20} /> {t.view.name}
             </h1>
             <p className={s.subtitle}>
-              {t.loading ? "Loading…" : `${filtered ? `${rows.length} of ${t.records.length}` : t.records.length} ${t.records.length === 1 ? singular : t.tableName.toLowerCase()}`}
+              {t.loading ? "Loading…" : `${filtered ? `${matching} of ${totalRecords}` : totalRecords} ${totalRecords === 1 ? singular : t.tableName.toLowerCase()}`}
               {t.view.access === "locked" && " · Locked view"}
               {t.view.access === "personal" && " · Personal view"}
               {ui.subtitle && t.view.type === "grid" && !filtered ? ` · ${ui.subtitle}` : ""}
@@ -157,14 +171,25 @@ function Workspace({ initialRecordId }: { initialRecordId?: string }) {
           </p>
         )}
         {t.view.type !== "form" && <Toolbar onAddField={addField} />}
+        {t.view.type !== "form" && <ActiveFilters />}
         {query.trim() !== "" && t.view.type !== "form" && (
           <p className={s.searchNote} role="status">
-            {rows.length === 0 ? "No results" : `${rows.length} result${rows.length === 1 ? "" : "s"}`} for “{query.trim()}”
+            {matching === 0 ? "No results" : `${matching} result${matching === 1 ? "" : "s"}`} for “{query.trim()}”
             <button type="button" className={s.linkBtn} onClick={() => setQuery("")}>Clear</button>
           </p>
         )}
         <div className={s.contentRow}>
-          <div className={cn(s.content, t.view.type === "grid" && s.contentGrid)}>{body}</div>
+          <div className={cn(s.content, t.view.type === "grid" && s.contentGrid)}>
+            {body}
+            {serverMode && t.view.type !== "form" && (
+              <div className={s.loadMore} role="status">
+                <span>Showing {t.records.length} of {t.serverTotal} matching {t.tableName.toLowerCase()}{t.serverLoading ? " · loading…" : ""}</span>
+                {t.records.length < t.serverTotal && (
+                  <Button variant="secondary" size="sm" disabled={t.serverLoading} onClick={() => void queryServer({ filters: t.config.filters, sort: t.config.sort, search: query }, true)}>Load more</Button>
+                )}
+              </div>
+            )}
+          </div>
           {ui.panel === "voucher" && panelOpen && <VoucherPanel onClose={() => setPanelOpen(false)} focusId={editor?.recordId} />}
         </div>
       </main>

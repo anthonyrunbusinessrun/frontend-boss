@@ -10,10 +10,11 @@ import { displayText } from "@/lib/base/compute";
 import { primaryField } from "@/lib/base/fields";
 import { tableSeed } from "@/lib/base/definitions";
 import { VIEW_TYPE_INFO, viewTypeLabel } from "@/lib/base/viewDefaults";
-import type { ViewAccess, ViewDef, ViewType } from "@/lib/base/types";
+import { FORM_CATEGORIES, type FormCategory, type ViewAccess, type ViewDef, type ViewType } from "@/lib/base/types";
 import { cn } from "@/lib/cn";
 import { messageOf, useTable } from "./TableProvider";
 import s from "./base.module.css";
+import { CreateMenu } from "./CreateMenu";
 import { FloatingPanel } from "./ui";
 import { ViewIcon } from "./viewIcons";
 
@@ -34,8 +35,6 @@ export function Sidebar({ onOpenRecord }: { onOpenRecord: (id: string) => void }
   const singular = tableSeed(t.slug)?.singular ?? "record";
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [createAnchor, setCreateAnchor] = useState<HTMLElement | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
   const [menu, setMenu] = useState<{ kind: "view" | "section"; id: string; el: HTMLElement; sub?: "move" } | null>(null);
   const [modal, setModal] = useState<null | { type: "createView"; viewType: ViewType } | { type: "createSection" } | { type: "rename"; kind: "view" | "section"; id: string } | { type: "delete"; kind: "view" | "section"; id: string }>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -135,6 +134,7 @@ export function Sidebar({ onOpenRecord }: { onOpenRecord: (id: string) => void }
         <button type="button" className={s.sideBtn} aria-current={active ? "page" : undefined} onClick={() => t.selectView(v.id)}>
           <ViewIcon type={v.type} />
           <span className={s.sideLabel}>{v.name}</span>
+          {v.type === "form" && <span className={cn(s.catTag, (v.config.form?.category ?? "Work") === "Vouchers" && s.catTagVouchers)} title="Form category">{v.config.form?.category ?? "Work"}</span>}
           {v.access === "personal" && <User size={12} className={s.sideBadge} aria-label="Personal view" />}
           {v.access === "locked" && <Lock size={12} className={s.sideBadge} aria-label="Locked view" />}
           {fav && opts.draggable !== false && <Star size={11} className={s.sideStar} fill="currentColor" aria-label="Favorite" />}
@@ -203,32 +203,12 @@ export function Sidebar({ onOpenRecord }: { onOpenRecord: (id: string) => void }
 
   return (
     <aside className={s.sidebar} aria-label="Views">
-      <button ref={setCreateAnchor} type="button" className={s.createBtn} aria-haspopup="menu" aria-expanded={createOpen} onClick={() => setCreateOpen((o) => !o)}>
-        <Plus size={16} strokeWidth={2.5} aria-hidden /> Create new…
-      </button>
-      <FloatingPanel anchor={createAnchor} open={createOpen} onClose={() => setCreateOpen(false)} width={230}>
-        <ul className={s.menu} role="menu" aria-label="Create">
-          {VIEW_TYPE_INFO.filter((v) => v.type !== "form").map((v) => (
-            <li key={v.type}>
-              <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setCreateOpen(false); setModal({ type: "createView", viewType: v.type }); }}>
-                <ViewIcon type={v.type} /> {v.label}
-              </button>
-            </li>
-          ))}
-          <li role="separator" className={s.menuSep} />
-          <li>
-            <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setCreateOpen(false); setModal({ type: "createView", viewType: "form" }); }}>
-              <ViewIcon type="form" /> Form
-            </button>
-          </li>
-          <li role="separator" className={s.menuSep} />
-          <li>
-            <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setCreateOpen(false); setModal({ type: "createSection" }); }}>
-              <ViewIcon type="section" /> Section
-            </button>
-          </li>
-        </ul>
-      </FloatingPanel>
+      <CreateMenu
+        onPick={(kind) => {
+          if (kind === "section") setModal({ type: "createSection" });
+          else setModal({ type: "createView", viewType: kind });
+        }}
+      />
 
       <label className={s.finder}>
         <Search size={15} className={s.finderIcon} aria-hidden />
@@ -312,8 +292,8 @@ export function Sidebar({ onOpenRecord }: { onOpenRecord: (id: string) => void }
           type={modal.viewType}
           defaultName={`${cap(singular)}’s ${viewTypeLabel(modal.viewType)}`}
           onClose={() => setModal(null)}
-          onCreate={async (name, access) => {
-            const v = await t.createView({ name, type: modal.viewType, access });
+          onCreate={async (name, access, category) => {
+            const v = await t.createView({ name, type: modal.viewType, access, ...(modal.viewType === "form" ? { category } : {}) });
             toast.success(`${viewTypeLabel(v.type)} view “${v.name}” created.`);
             setModal(null);
           }}
@@ -379,8 +359,9 @@ function NameModal({ title, label, initial, action, help, onClose, onSubmit }: {
   );
 }
 
-function CreateViewModal({ type, defaultName, onClose, onCreate }: { type: ViewType; defaultName: string; onClose: () => void; onCreate: (name: string, access: ViewAccess) => Promise<void> }) {
+function CreateViewModal({ type, defaultName, onClose, onCreate }: { type: ViewType; defaultName: string; onClose: () => void; onCreate: (name: string, access: ViewAccess, category: FormCategory) => Promise<void> }) {
   const [name, setName] = useState(defaultName);
+  const [category, setCategory] = useState<FormCategory>("Work");
   const [access, setAccess] = useState<ViewAccess>("collaborative");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -389,7 +370,7 @@ function CreateViewModal({ type, defaultName, onClose, onCreate }: { type: ViewT
     if (!name.trim()) return setError("Give the view a name.");
     setBusy(true);
     try {
-      await onCreate(name.trim(), access);
+      await onCreate(name.trim(), access, category);
     } catch (e) {
       setError(messageOf(e));
       setBusy(false);
@@ -403,6 +384,20 @@ function CreateViewModal({ type, defaultName, onClose, onCreate }: { type: ViewT
           <input className={cn(s.input, error && s.invalid)} value={name} autoFocus data-autofocus maxLength={100} onFocus={(e) => e.currentTarget.select()} onChange={(e) => { setName(e.target.value); setError(null); }} aria-invalid={!!error} />
           {error && <span className={s.fieldError} role="alert">{error}</span>}
         </label>
+        {type === "form" && (
+          <label className={s.fieldRow}>
+            <span className={s.fieldLabel}>Form category</span>
+            <span className={s.selectWrap}>
+              <select className={s.input} value={category} onChange={(e) => setCategory(e.target.value as FormCategory)}>
+                {FORM_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} aria-hidden />
+            </span>
+            <span className={s.fieldHint}>What the form is for. You can change it later in the form settings.</span>
+          </label>
+        )}
         <fieldset className={s.fieldset}>
           <legend className={s.fieldLabel}>Who can edit</legend>
           <div className={s.radioRow} role="radiogroup" aria-label="Who can edit">

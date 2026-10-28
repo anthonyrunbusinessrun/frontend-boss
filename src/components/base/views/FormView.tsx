@@ -4,10 +4,10 @@ import { ArrowDown, ArrowUp, CheckCircle2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { isEditableType } from "@/lib/base/fields";
+import { isUserEditable } from "@/lib/base/fields";
 import { hasErrors, validateRecordInput } from "@/lib/base/validate";
 import { defaultFormConfig, syncFormConfig } from "@/lib/base/viewDefaults";
-import type { FormConfig, FormFieldConfig } from "@/lib/base/types";
+import { FORM_CATEGORIES, type FormCategory, type FormConfig, type FormFieldConfig } from "@/lib/base/types";
 import { cn } from "@/lib/cn";
 import { ClientError } from "../client";
 import { FieldInput, FieldRow } from "../inputs";
@@ -62,6 +62,15 @@ export function FormView() {
       {canBuild && (
         <aside className={s.formBuilder} aria-label="Form settings">
           <h2 className={s.cardTitle}>Form settings</h2>
+          <label className={s.fieldRow}>
+            <span className={s.fieldLabel}>Category</span>
+            <select className={s.input} value={form.category ?? "Work"} onChange={(e) => setForm({ ...form, category: e.target.value as FormCategory })}>
+              {FORM_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <span className={s.fieldHint}>What this form is for. It is not the view type.</span>
+          </label>
           <label className={s.fieldRow}><span className={s.fieldLabel}>Title</span><input className={s.input} value={form.title} maxLength={200} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
           <label className={s.fieldRow}><span className={s.fieldLabel}>Description</span><textarea className={s.input} rows={2} value={form.description} maxLength={2000} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
           <div className={s.row2}>
@@ -73,7 +82,7 @@ export function FormView() {
           <ul className={s.builderList}>
             {form.fields.map((f, i) => {
               const def = t.fieldMap.get(f.key);
-              if (!def || !isEditableType(def.type)) return null;
+              if (!def || !isUserEditable(def, "create")) return null;
               return (
                 <li key={f.key} className={cn(s.builderRow, !f.visible && s.builderOff)}>
                   <label className={s.toggleRow}>
@@ -96,6 +105,7 @@ export function FormView() {
       )}
 
       <section className={s.formPreview} aria-label="Form">
+        <p className={s.formCat}><span className={cn(s.catTag, form.category === "Vouchers" && s.catTagVouchers)}>{form.category ?? "Work"}</span> form</p>
         {!canBuild && t.unsaved && <p className={s.muted}>This form is locked. You can fill it in, but not change it.</p>}
         <div className={s.formSheet}>
           {done ? (

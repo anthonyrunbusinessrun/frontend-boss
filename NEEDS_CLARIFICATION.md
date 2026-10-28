@@ -95,3 +95,32 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 - Layout is designed for desktop and tablet widths. Phone layouts are usable but not tuned; the app frame
   still has a 960 px minimum width on most screens.
 - The legacy design-fidelity scripts and the AIS module are not part of the new navigation.
+
+## 10. Second round of updates
+
+**Create menu.** Same nine options and behaviour; new original design (tile launcher). Shown as a bottom sheet below 640 px.
+
+**Automatic codes.**
+- Only Actions (`A-`), Leads (`L-`) and Transactions (5 digits) have sequences. Forms codes (`JC`, `WT`…) are mnemonics, so they stay typed.
+- A code must follow the pattern to count: a legacy code in another format does not move the sequence.
+- The number shown in the side modal is a preview. If someone else saves first, the server assigns the next number and the toast says so.
+- Existing codes are untouched. The unique index is created by the migration; if an existing database already has duplicate
+  codes the migration prints a warning and skips the index (the server still blocks new duplicates).
+
+**Voucher PDFs.**
+- `Voucher.pdf` is an image-only Figma export with no text layer, so its fields were read from the picture.
+- The L (FD) and R (BL) marks are tied to the document type because the two samples show it; confirm what they mean.
+- Types: FD = Freight Delivery Confirmation (the supplied PDF), BL = Bill of Lading (the earlier sample). Existing vouchers became BL / Issued.
+- Manifest and pack rows are text, one row per line, columns separated by ` | `; use `/` for a new line in a destination.
+- The generated PDF follows the reference's proportions and positions but uses a free look-alike font (Saira Semi Condensed)
+  and a redrawn logo. It carries a footer saying it was generated and is not an original document.
+- Replacing an original leaves the old file stored in the database but unattached.
+- Preview shows up to 8 pages; PDFs are limited to 5 MB.
+
+**Forms category.** Work / Vouchers exists on form records (Forms table) and on Form *views* (builder, create dialog, sidebar tag).
+Existing forms and form views were set to Work.
+
+**Filtering.**
+- Not built from the reference: “Describe how to filter this view” (an AI feature) and “Add condition group” (nested groups). Conditions are one list joined by and / or, evaluated left to right.
+- In server mode (very large tables) search covers stored text, number, date, select and contact values, not linked-record names; grouping, calendar placement and timelines use the loaded page only. A filter on a field derived from another table (“folios in this category”) is refused there.
+- Double-clicking a read-only cell (Code, Voucher No., PDF status…) opens the record.

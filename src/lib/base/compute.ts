@@ -15,6 +15,23 @@ export function stockStatus(qty: unknown, reorder: unknown): StockStatus | null 
   return "In stock";
 }
 
+/** "LLG-FD-15574": prefix + document type + (autonumber + offset). Blank until the voucher has a number. */
+export function voucherNumber(spec: { number: string; type: string; prefix: string; offset: number }, row: RecordRow): string | null {
+  const n = toNumber(row[spec.number]);
+  if (n === null) return null;
+  const type = typeof row[spec.type] === "string" && row[spec.type] ? String(row[spec.type]) : "BL";
+  return `${spec.prefix}${type}-${n + spec.offset}`;
+}
+
+export type FileStatus = "Original uploaded" | "Generated only" | "No PDF";
+
+/** The original upload always wins: a generated copy never hides or replaces it. */
+export function fileStatus(original: unknown, generated: unknown): FileStatus {
+  if (readAttachments(original).length > 0) return "Original uploaded";
+  if (readAttachments(generated).length > 0) return "Generated only";
+  return "No PDF";
+}
+
 export function toNumber(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : Number(String(v).replace(/[$,%\s]/g, ""));
@@ -36,6 +53,8 @@ export function fieldValue(field: FieldDef, row: RecordRow, linked: LinkLookup =
     return n === null ? null : n + spec.add;
   }
   if (spec.fn === "stockStatus") return stockStatus(row[spec.qty], row[spec.reorder]);
+  if (spec.fn === "voucherNo") return voucherNumber(spec, row);
+  if (spec.fn === "fileStatus") return fileStatus(row[spec.original], row[spec.generated]);
   return null;
 }
 

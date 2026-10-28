@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { applyGroups, visibleFields, type RowGroup } from "@/lib/base/query";
-import { isEditableType } from "@/lib/base/fields";
+import { isUserEditable } from "@/lib/base/fields";
 import { hasErrors, validateRecordInput } from "@/lib/base/validate";
 import type { FieldDef, RecordRow } from "@/lib/base/types";
 import { cn } from "@/lib/cn";
@@ -218,7 +218,7 @@ export function GridView({ rows, onOpen, onCreate, onEditField, onAddField }: Vi
     else if (e.key === "ArrowRight") go(rIdx, cIdx + 1);
     else if (e.key === "Enter" || e.key === "F2") {
       const f = cols[cIdx];
-      if (isEditableType(f.type)) {
+      if (isUserEditable(f, "update")) {
         if (f.type === "checkbox") void toggleCheckbox(visibleRows[rIdx], f);
         else setEditing({ ...active });
         e.preventDefault();
@@ -255,7 +255,7 @@ export function GridView({ rows, onOpen, onCreate, onEditField, onAddField }: Vi
 
   const gridTemplate = `44px 40px ${cols.map((f) => `${width(f)}px`).join(" ")} 120px`;
   const totalWidth = 84 + cols.reduce((n, f) => n + width(f), 0) + 120;
-  const presetFor = (g: RowGroup) => (g.field && (g.field.type === "singleSelect" || g.field.type === "checkbox" || g.field.type === "link") && isEditableType(g.field.type) ? { [g.field.key]: g.field.type === "checkbox" ? g.value === true : (g.value ?? null) } : undefined);
+  const presetFor = (g: RowGroup) => (g.field && (g.field.type === "singleSelect" || g.field.type === "checkbox" || g.field.type === "link") && isUserEditable(g.field, "create") ? { [g.field.key]: g.field.type === "checkbox" ? g.value === true : (g.value ?? null) } : undefined);
 
   return (
     <div className={s.gridWrap}>
@@ -318,7 +318,7 @@ export function GridView({ rows, onOpen, onCreate, onEditField, onAddField }: Vi
                 {cols.map((f) => {
                   const isActive = active?.id === row.id && active.key === f.key;
                   const isEditing = editing?.id === row.id && editing.key === f.key;
-                  const editable = isEditableType(f.type);
+                  const editable = isUserEditable(f, "update");
                   return (
                     <div
                       key={f.key}

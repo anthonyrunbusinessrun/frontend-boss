@@ -309,9 +309,9 @@ describe("table engine API (PostgreSQL)", { skip }, () => {
     });
 
     it("a table always keeps at least one view", async () => {
-      const b = await bundle("forms");
+      const b = await bundle("concepts");
       assert.equal(b.views.length, 1);
-      const r = await call("DELETE", `tables/forms/views/${b.views[0].id}`);
+      const r = await call("DELETE", `tables/concepts/views/${b.views[0].id}`);
       assert.equal(r.status, 409);
     });
   });

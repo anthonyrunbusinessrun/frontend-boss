@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/Toast";
 import { fieldByKey } from "@/lib/base/fields";
 import { applyNodes, buildTree, moveNode, treeToNodes, type DropTarget } from "@/lib/base/layout";
 import { pruneConfig } from "@/lib/base/viewDefaults";
-import type { AttachmentValue, FavoriteDef, FieldDef, FieldOptions, LinkedTable, RecordRow, SectionDef, TableBundle, ViewAccess, ViewConfig, ViewDef, ViewType } from "@/lib/base/types";
+import type { AttachmentValue, FavoriteDef, FieldDef, FieldOptions, FilterRule, FormCategory, LinkedTable, RecordRow, SectionDef, SortRule, TableBundle, ViewAccess, ViewConfig, ViewDef, ViewType } from "@/lib/base/types";
 import { api, ClientError, ensureSession } from "./client";
 
 export interface TableApi {
@@ -20,6 +20,15 @@ export interface TableApi {
   favorites: FavoriteDef[];
   linked: Record<string, LinkedTable>;
   loading: boolean;
+
+  /** Large table: filtering, search and sorting happen on the server and `records` is the loaded page. */
+  serverMode: boolean;
+  /** Records in the table (all of them, even in server mode). */
+  recordCount: number;
+  /** Records matching the current server query. */
+  serverTotal: number;
+  serverLoading: boolean;
+  queryServer: (q: { filters: FilterRule[]; sort: SortRule[]; search: string }, append?: boolean) => Promise<void>;
 
   view: ViewDef;
   /** View configuration including changes that could not be saved (locked or someone else's personal view). */
@@ -39,7 +48,7 @@ export interface TableApi {
   updateField: (key: string, input: { name?: string; options?: FieldOptions; required?: boolean }) => Promise<void>;
   deleteField: (key: string) => Promise<void>;
 
-  createView: (input: { name: string; type: ViewType; access: ViewAccess; sectionId?: string | null }) => Promise<ViewDef>;
+  createView: (input: { name: string; type: ViewType; access: ViewAccess; sectionId?: string | null; category?: FormCategory }) => Promise<ViewDef>;
   renameView: (id: string, name: string) => Promise<void>;
   setAccess: (id: string, access: ViewAccess) => Promise<void>;
   deleteView: (id: string) => Promise<void>;
@@ -54,6 +63,8 @@ export interface TableApi {
   toggleFavorite: (kind: "view" | "record", id: string) => Promise<void>;
   upload: (file: File | Blob, name?: string) => Promise<AttachmentValue>;
   refresh: () => Promise<void>;
+  /** Replace a record with a fresh copy returned by the server (after a file upload or PDF generation). */
+  applyRecord: (record: RecordRow) => void;
 }
 
 const Ctx = createContext<TableApi | null>(null);
@@ -79,6 +90,10 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
 
   const [bundle, setBundle] = useState(initial);
   const [loading, setLoading] = useState(initial.userId === null);
+  const [serverTotal, setServerTotal] = useState(initial.recordCount);
+  const [serverLoading, setServerLoading] = useState(false);
+  const lastQuery = useRef<{ filters: FilterRule[]; sort: SortRule[]; search: string } | null>(null);
+  const queryToken = useRef(0);
   const [activeId, setActiveId] = useState<string | undefined>(() => (initialViewId && initial.views.some((v) => v.id === initialViewId) ? initialViewId : initial.views[0]?.id));
   // Settings changed in a view the person cannot edit: applied for this visit only.
   const [overrides, setOverrides] = useState<Record<string, ViewConfig>>({});
@@ -211,7 +226,8 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
   const createRecord = useCallback(
     async (values: Record<string, unknown>) => {
       const rec = await api.createRecord(slug, values);
-      patchBundle((b) => ({ records: [...b.records, rec] }));
+      patchBundle((b) => ({ records: [...b.records, rec], recordCount: b.recordCount + 1 }));
+      setServerTotal((n) => n + 1);
       return rec;
     },
     [slug, patchBundle],
@@ -237,7 +253,8 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
     async (ids: string[]) => {
       const out = await api.deleteRecords(slug, ids);
       const gone = new Set(ids);
-      patchBundle((b) => ({ records: b.records.filter((r) => !gone.has(r.id)), favorites: b.favorites.filter((f) => !(f.kind === "record" && gone.has(f.refId))) }));
+      patchBundle((b) => ({ records: b.records.filter((r) => !gone.has(r.id)), recordCount: Math.max(0, b.recordCount - out.deleted), favorites: b.favorites.filter((f) => !(f.kind === "record" && gone.has(f.refId))) }));
+      setServerTotal((n) => Math.max(0, n - out.deleted));
       return out;
     },
     [slug, patchBundle],
@@ -246,7 +263,7 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
   const submitForm = useCallback(
     async (viewId: string, values: Record<string, unknown>) => {
       const rec = await api.submitForm(slug, viewId, values);
-      patchBundle((b) => ({ records: [...b.records, rec] }));
+      patchBundle((b) => ({ records: [...b.records, rec], recordCount: b.recordCount + 1 }));
       return rec;
     },
     [slug, patchBundle],
@@ -285,7 +302,7 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
   /* ------------------------------------------------------------------------ views */
 
   const createView = useCallback(
-    async (input: { name: string; type: ViewType; access: ViewAccess; sectionId?: string | null }) => {
+    async (input: { name: string; type: ViewType; access: ViewAccess; sectionId?: string | null; category?: FormCategory }) => {
       const v = await api.createView(slug, input);
       patchBundle((b) => ({ views: [...b.views, v] }));
       selectView(v.id);
@@ -384,6 +401,27 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
   );
 
   const upload = useCallback((file: File | Blob, name?: string) => api.upload(file, name), []);
+  const applyRecord = useCallback((rec: RecordRow) => patchBundle((b) => ({ records: b.records.some((r) => r.id === rec.id) ? b.records.map((r) => (r.id === rec.id ? rec : r)) : [...b.records, rec] })), [patchBundle]);
+
+  const queryServer = useCallback(
+    async (q: { filters: FilterRule[]; sort: SortRule[]; search: string }, append = false) => {
+      const token = (queryToken.current += 1);
+      setServerLoading(true);
+      try {
+        const offset = append ? ref.current.records.length : 0;
+        const res = await api.query(slug, { ...q, limit: ref.current.serverPage, offset });
+        if (token !== queryToken.current) return; // a newer query superseded this one
+        lastQuery.current = q;
+        patchBundle((b) => ({ records: append ? [...b.records, ...res.records] : res.records }));
+        setServerTotal(res.total);
+      } catch (e) {
+        if (token === queryToken.current) toast.error(messageOf(e));
+      } finally {
+        if (token === queryToken.current) setServerLoading(false);
+      }
+    },
+    [slug, patchBundle, toast],
+  );
 
   const value = useMemo<TableApi>(
     () => ({
@@ -398,6 +436,11 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
       favorites: bundle.favorites,
       linked: bundle.linked,
       loading,
+      serverMode: bundle.serverMode,
+      recordCount: bundle.recordCount,
+      serverTotal,
+      serverLoading,
+      queryServer,
       view,
       config,
       canEditView: (v) => canEdit(v, bundle.userId),
@@ -424,8 +467,9 @@ export function TableProvider({ initial, initialViewId, children }: { initial: T
       toggleFavorite,
       upload,
       refresh,
+      applyRecord,
     }),
-    [slug, bundle, loading, view, config, editable, selectView, patchConfig, createRecord, updateRecord, deleteRecords, submitForm, createField, updateField, deleteField, createView, renameView, setAccess, deleteView, duplicateView, createSection, renameSection, deleteSection, move, isFavorite, toggleFavorite, upload, refresh],
+    [slug, bundle, loading, serverTotal, serverLoading, queryServer, view, config, editable, selectView, patchConfig, createRecord, updateRecord, deleteRecords, submitForm, createField, updateField, deleteField, createView, renameView, setAccess, deleteView, duplicateView, createSection, renameSection, deleteSection, move, isFavorite, toggleFavorite, upload, refresh, applyRecord],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

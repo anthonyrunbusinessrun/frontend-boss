@@ -41,6 +41,10 @@ const rule = (id: string, field: string, op: ViewConfig["filters"][number]["op"]
 
 export const VOUCHER_START = 11574;
 
+/** Fields that belong to the voucher document; hidden in the compact grid views. */
+export const VOUCHER_DOCUMENT_KEYS = ["headline", "docStatus", "pdf", "generatedPdf", "accrualDate", "vendorCode", "vendorAccount", "contractNo", "operatorCode", "operatedBy", "consignee", "shipTo", "deliverVia", "deliverPhone", "deliverPhone2", "resource", "tracking", "voucherNote", "terms", "manifestLines", "packLines"];
+export const VOUCHER_LEGACY_KEYS = ["voucherId", "sp", "svc", "debit", "credit", "balance", "scans", "prefix", "label", "ref", "sum", "cover"];
+
 export const TABLES: TableSeed[] = [
   /* ------------------------------------------------------------------ profiles */
   {
@@ -129,7 +133,7 @@ export const TABLES: TableSeed[] = [
     name: "Actions",
     singular: "action",
     fields: [
-      { key: "code", name: "Code", type: "text", required: true, primary: true, options: { unique: true } },
+      { key: "code", name: "Code", type: "text", required: true, primary: true, options: { unique: true, sequence: { prefix: "A-" }, help: "Assigned automatically: the next number after the highest existing code." } },
       { key: "accrue", name: "Accrue", type: "date", required: true },
       { key: "title", name: "Title", type: "text", required: true },
       { key: "type", name: "Type", type: "singleSelect", required: true, options: sel(["Tasking", "Training", "Notice"], ["blue", "orange", "yellow"]) },
@@ -155,18 +159,33 @@ export const TABLES: TableSeed[] = [
       { key: "i", name: "I", type: "autonumber", primary: true, options: { start: VOUCHER_START } },
       { key: "no", name: "No", type: "computed", options: { computed: { fn: "offset", source: "i", add: 1000 } } },
       { key: "vsf", name: "VSF", type: "singleSelect", options: sel(["VSF"], ["blue"]) },
-      { key: "manifest", name: "Manifest", type: "longText", options: { help: "One line per shipment line, for example “I/T-015 · ATLANTA · Wipes”." } },
+      { key: "manifest", name: "Manifest", type: "longText", options: { help: "Short summary, for example “I/T-015 · GREENCASTLE · Wipes”." } },
       { key: "qr", name: "QR", type: "attachment", options: { imagesOnly: true } },
-      // Voucher document (Bill of Lading) details
+      // --- the voucher document (fields of the supplied FEMA / Infant & Toddlers PDF) ---
+      { key: "voucherNo", name: "Voucher No.", type: "computed", options: { computed: { fn: "voucherNo", number: "i", type: "docType", prefix: "LLG-", offset: 4000 } } },
+      { key: "docType", name: "Type", type: "singleSelect", options: { ...sel(["FD", "BL"], ["blue", "orange"]), defaultValue: "FD", help: "FD = Freight Delivery Confirmation, BL = Bill of Lading." } },
+      { key: "docStatus", name: "Status", type: "singleSelect", options: { ...sel(["Issued"], ["gray"]), defaultValue: "Issued" } },
+      { key: "headline", name: "Headline", type: "text", options: { placeholder: "e.g. ASN - DELIVERED", help: "Text of the dark bar at the top of the voucher." } },
+      { key: "pdfStatus", name: "PDF", type: "computed", options: { computed: { fn: "fileStatus", original: "pdf", generated: "generatedPdf" } } },
+      { key: "pdf", name: "Original PDF", type: "attachment", options: { pdfOnly: true, managed: "upload", help: "The uploaded original. It is never replaced or edited by the app." } },
+      { key: "generatedPdf", name: "Generated PDF", type: "attachment", options: { pdfOnly: true, managed: "system", help: "Created by BOSS from the saved fields. Not an original document." } },
       { key: "accrualDate", name: "Accrual Date", type: "date" },
+      { key: "vendorCode", name: "Vendor Account Code", type: "text", options: { placeholder: "e.g. FEMA-HQ" } },
+      { key: "vendorAccount", name: "Vendor Account", type: "longText", options: { help: "Name and address, one line each." } },
+      { key: "contractNo", name: "Contract / PO No.", type: "text", options: { placeholder: "e.g. 70FB7026F00000036" } },
+      { key: "operatorCode", name: "Operated By Code", type: "text", options: { placeholder: "e.g. DC-GRC" } },
+      { key: "operatedBy", name: "Operated By", type: "longText", options: { help: "Name, address and phone, one line each." } },
       { key: "consignee", name: "Consignee", type: "longText" },
       { key: "shipTo", name: "Ship To", type: "longText" },
       { key: "deliverVia", name: "Deliver Via", type: "text" },
       { key: "deliverPhone", name: "Deliver Via Phone", type: "phone" },
+      { key: "deliverPhone2", name: "Deliver Via Phone 2", type: "phone" },
       { key: "resource", name: "Resource", type: "text" },
       { key: "tracking", name: "Tracking", type: "text" },
       { key: "voucherNote", name: "Voucher Note", type: "longText" },
       { key: "terms", name: "Terms of Trade", type: "longText" },
+      { key: "manifestLines", name: "Manifest of Order", type: "longText", options: { help: "One row per line: CLIN | Title | Description | Delivery | Freight #" } },
+      { key: "packLines", name: "Pack Details", type: "longText", options: { help: "One row per line: CLIN | Pack Size | Pallet Config | Per Kit | Qty | Destination (use / for a new line)" } },
       // Fields of the previous voucher ledger layout. Kept so existing records lose nothing.
       { key: "voucherId", name: "Voucher ID", type: "text", options: { unique: true } },
       { key: "sp", name: "SP", type: "number", options: { format: "integer", min: 0 } },
@@ -188,13 +207,13 @@ export const TABLES: TableSeed[] = [
         type: "grid",
         config: {
           sort: [{ field: "i", dir: "asc" }],
-          hidden: ["accrualDate", "consignee", "shipTo", "deliverVia", "deliverPhone", "resource", "tracking", "voucherNote", "terms", "voucherId", "sp", "svc", "debit", "credit", "balance", "scans", "prefix", "label", "ref", "sum", "cover"],
-          order: ["i", "no", "vsf", "manifest", "qr"],
-          widths: { i: 96, no: 110, vsf: 110, manifest: 360, qr: 140 },
+          hidden: [...VOUCHER_DOCUMENT_KEYS, ...VOUCHER_LEGACY_KEYS],
+          order: ["i", "no", "vsf", "manifest", "qr", "voucherNo", "docType", "pdfStatus"],
+          widths: { i: 90, no: 100, vsf: 90, manifest: 240, qr: 120, voucherNo: 140, docType: 70, pdfStatus: 140 },
         },
       },
-      { key: "document", name: "Voucher Details", type: "grid", config: { sort: [{ field: "i", dir: "asc" }], hidden: ["voucherId", "sp", "svc", "debit", "credit", "balance", "scans", "prefix", "label", "ref", "sum", "cover"] } },
-      { key: "ledger", name: "Ledger (previous layout)", type: "grid", config: { hidden: ["manifest", "qr", "accrualDate", "consignee", "shipTo", "deliverVia", "deliverPhone", "resource", "tracking", "voucherNote", "terms"] } },
+      { key: "document", name: "Voucher Details", type: "grid", config: { sort: [{ field: "i", dir: "asc" }], hidden: [...VOUCHER_LEGACY_KEYS, "no", "vsf", "manifest", "qr", "consignee", "shipTo"] } },
+      { key: "ledger", name: "Ledger (previous layout)", type: "grid", config: { hidden: ["manifest", "qr", ...VOUCHER_DOCUMENT_KEYS] } },
     ],
   },
 
@@ -204,7 +223,7 @@ export const TABLES: TableSeed[] = [
     name: "Transactions",
     singular: "transaction",
     fields: [
-      { key: "trans", name: "Trans", type: "text", required: true, primary: true },
+      { key: "trans", name: "Trans", type: "text", required: true, primary: true, options: { unique: true, sequence: { prefix: "", pad: 5 }, help: "Assigned automatically." } },
       { key: "voucher", name: "Voucher", type: "text", required: true },
       { key: "custRef", name: "Cust Ref", type: "text" },
       { key: "accrue", name: "Accrue", type: "date" },
@@ -258,12 +277,17 @@ export const TABLES: TableSeed[] = [
       { key: "type", name: "Type", type: "text" },
       { key: "slug", name: "Slug", type: "text", required: true },
       { key: "style", name: "Style", type: "singleSelect", options: sel(["Work"], ["green"]) },
+      { key: "category", name: "Category", type: "singleSelect", required: true, options: { ...sel(["Work", "Vouchers"], ["green", "orange"]), defaultValue: "Work", help: "What the form is for. This is not the view type." } },
       { key: "title", name: "Title", type: "text", required: true },
       { key: "longTitle", name: "Long Title", type: "text" },
       { key: "group", name: "Group", type: "singleSelect", options: sel(["Buy", "Blanket"], ["green", "cyan"]) },
       { key: "description", name: "Description", type: "longText" },
     ],
-    views: [{ key: "all", name: "All Forms", type: "grid" }],
+    views: [
+      { key: "all", name: "All Forms", type: "grid", config: { groupBy: [{ field: "category", dir: "asc" }] } },
+      { key: "work", name: "Work forms", type: "grid", config: { filters: [rule("r1", "category", "is", "Work")] } },
+      { key: "vouchers", name: "Voucher forms", type: "grid", config: { filters: [rule("r1", "category", "is", "Vouchers")] } },
+    ],
   },
 
   /* ----------------------------------------------------------------- concepts */
@@ -318,7 +342,7 @@ export const TABLES: TableSeed[] = [
     name: "Leads",
     singular: "lead",
     fields: [
-      { key: "leadId", name: "Lead ID", type: "text", required: true, primary: true, options: { unique: true } },
+      { key: "leadId", name: "Lead ID", type: "text", required: true, primary: true, options: { unique: true, sequence: { prefix: "L-" }, help: "Assigned automatically." } },
       { key: "client", name: "Client", type: "text", required: true },
       { key: "title", name: "Title", type: "text", required: true },
       { key: "type", name: "Type", type: "singleSelect", options: sel(["Solicitation", "Sources Sought", "Combined Syn/Solicitation", "Request for Information"], ["blue", "orange", "purple", "cyan"]) },

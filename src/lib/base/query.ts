@@ -13,7 +13,7 @@ export function opKind(field: FieldDef): OpKind {
       return "number";
     case "computed": {
       const fn = field.options.computed?.fn;
-      return fn === "offset" ? "number" : fn === "linkedFrom" ? "multi" : "select";
+      return fn === "offset" ? "number" : fn === "linkedFrom" ? "multi" : fn === "voucherNo" ? "text" : "select";
     }
     case "date":
       return "date";
@@ -37,6 +37,7 @@ const EMPTY_OPS: Array<{ op: FilterOp; label: string }> = [
   { op: "isNotEmpty", label: "is not empty" },
 ];
 
+/** Only operators that make sense for the field type are offered. */
 export const OPS_BY_KIND: Record<OpKind, Array<{ op: FilterOp; label: string }>> = {
   text: [
     { op: "contains", label: "contains" },
@@ -46,34 +47,42 @@ export const OPS_BY_KIND: Record<OpKind, Array<{ op: FilterOp; label: string }>>
     ...EMPTY_OPS,
   ],
   number: [
-    { op: "eq", label: "=" },
-    { op: "neq", label: "≠" },
-    { op: "gt", label: ">" },
-    { op: "gte", label: "≥" },
-    { op: "lt", label: "<" },
-    { op: "lte", label: "≤" },
+    { op: "eq", label: "equals" },
+    { op: "neq", label: "does not equal" },
+    { op: "gt", label: "is greater than" },
+    { op: "gte", label: "is at least" },
+    { op: "lt", label: "is less than" },
+    { op: "lte", label: "is at most" },
+    { op: "between", label: "is between" },
     ...EMPTY_OPS,
   ],
   date: [
-    { op: "is", label: "is" },
+    { op: "is", label: "is on" },
     { op: "before", label: "is before" },
     { op: "after", label: "is after" },
+    { op: "between", label: "is within" },
     ...EMPTY_OPS,
   ],
   boolean: [{ op: "is", label: "is" }],
   select: [
     { op: "is", label: "is" },
     { op: "isNot", label: "is not" },
+    { op: "isAnyOf", label: "is any of" },
+    { op: "isNoneOf", label: "is none of" },
     ...EMPTY_OPS,
   ],
   multi: [
     { op: "contains", label: "has" },
     { op: "notContains", label: "does not have" },
+    { op: "isAnyOf", label: "includes any of" },
+    { op: "isNoneOf", label: "excludes all of" },
     ...EMPTY_OPS,
   ],
   link: [
     { op: "is", label: "is" },
     { op: "isNot", label: "is not" },
+    { op: "isAnyOf", label: "is any of" },
+    { op: "isNoneOf", label: "is none of" },
     ...EMPTY_OPS,
   ],
   attachment: EMPTY_OPS,
@@ -81,11 +90,33 @@ export const OPS_BY_KIND: Record<OpKind, Array<{ op: FilterOp; label: string }>>
 
 export const opsFor = (field: FieldDef) => OPS_BY_KIND[opKind(field)];
 export const OPS_WITHOUT_VALUE: ReadonlySet<FilterOp> = new Set(["isEmpty", "isNotEmpty"]);
+export const OPS_WITH_LIST: ReadonlySet<FilterOp> = new Set(["isAnyOf", "isNoneOf"]);
 
 export function defaultRule(id: string, field: FieldDef): FilterRule {
   const kind = opKind(field);
   return { id, join: "and", field: field.key, op: OPS_BY_KIND[kind][0].op, value: kind === "boolean" ? true : "" };
 }
+
+/** A rule shown in the active-filter pills: "Status is Queue". */
+export function describeRule(rule: FilterRule, field: FieldDef | undefined, label: (v: string) => string = (v) => v): string {
+  if (!field) return "";
+  const op = opsFor(field).find((o) => o.op === rule.op)?.label ?? rule.op;
+  if (OPS_WITHOUT_VALUE.has(rule.op)) return `${field.name} ${op}`;
+  if (opKind(field) === "boolean") return `${field.name} ${rule.value === true || rule.value === "true" ? "checked" : "unchecked"}`;
+  if (OPS_WITH_LIST.has(rule.op)) return `${field.name} ${op} ${(rule.values ?? []).map(label).join(", ")}`;
+  if (rule.op === "between") return `${field.name} ${op} ${rule.value ?? "…"} and ${rule.value2 ?? "…"}`;
+  return `${field.name} ${op} ${label(String(rule.value ?? ""))}`;
+}
+
+/** A rule that cannot hide anything yet because its value has not been entered. */
+export function isIncomplete(rule: FilterRule): boolean {
+  if (OPS_WITHOUT_VALUE.has(rule.op) || rule.op === "is" && typeof rule.value === "boolean") return false;
+  if (OPS_WITH_LIST.has(rule.op)) return !(rule.values && rule.values.length > 0);
+  if (rule.op === "between") return blankValue(rule.value) && blankValue(rule.value2);
+  return blankValue(rule.value);
+}
+
+const blankValue = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -109,14 +140,29 @@ function evaluate(rule: FilterRule, field: FieldDef, row: RecordRow, linked: Lin
   if (kind === "boolean") return Boolean(fieldValue(field, row, linked)) === (rule.value === true || rule.value === "true");
   if (rule.op === "isEmpty") return isEmptyValue(field, row, linked);
   if (rule.op === "isNotEmpty") return !isEmptyValue(field, row, linked);
-
-  const wantedRaw = rule.value === null || rule.value === undefined ? "" : String(rule.value).trim();
-  if (wantedRaw === "") return null;
+  if (isIncomplete(rule)) return null;
 
   const raw = fieldValue(field, row, linked);
+  const wantedRaw = rule.value === null || rule.value === undefined ? "" : String(rule.value).trim();
+
+  if (OPS_WITH_LIST.has(rule.op)) {
+    const wanted = new Set((rule.values ?? []).map((v) => v.toLowerCase()));
+    let have: string[];
+    if (kind === "link") have = linkIds(raw);
+    else if (Array.isArray(raw)) have = raw.map(String);
+    else have = raw === null || raw === undefined || raw === "" ? [] : [String(raw)];
+    const hit = have.some((h) => wanted.has(h.toLowerCase()));
+    return rule.op === "isAnyOf" ? hit : !hit;
+  }
 
   if (kind === "number") {
     const a = toNumber(raw);
+    if (rule.op === "between") {
+      const lo = toNumber(rule.value);
+      const hi = toNumber(rule.value2);
+      if (a === null) return false;
+      return (lo === null || a >= lo) && (hi === null || a <= hi);
+    }
     const b = toNumber(wantedRaw);
     if (b === null) return null;
     if (a === null) return rule.op === "neq";
@@ -133,6 +179,12 @@ function evaluate(rule: FilterRule, field: FieldDef, row: RecordRow, linked: Lin
 
   if (kind === "date") {
     const a = typeof raw === "string" ? raw.slice(0, 10) : "";
+    if (rule.op === "between") {
+      const lo = blankValue(rule.value) ? "" : String(rule.value).slice(0, 10);
+      const hi = blankValue(rule.value2) ? "" : String(rule.value2).slice(0, 10);
+      if (a === "") return false;
+      return (lo === "" || a >= lo) && (hi === "" || a <= hi);
+    }
     if (a === "") return rule.op === "isNot";
     switch (rule.op) {
       case "is": return a === wantedRaw;
@@ -182,6 +234,9 @@ export function applyFilters(rows: RecordRow[], rules: FilterRule[], fields: Fie
     return result ?? true;
   });
 }
+
+/** How many of a view's conditions are complete enough to filter anything. */
+export const activeFilterCount = (rules: FilterRule[], fields: FieldDef[]) => rules.filter((r) => fields.some((f) => f.key === r.field) && !isIncomplete(r)).length;
 
 /* ------------------------------ search ------------------------------ */
 

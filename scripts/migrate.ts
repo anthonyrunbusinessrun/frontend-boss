@@ -21,6 +21,7 @@ async function main() {
     const report = await applyBaseMigrations(pool, { freshSeed: seeded });
     console.log(`Table engine: ${report.tables} tables, +${report.fieldsAdded} fields, +${report.viewsAdded} views`);
     for (const b of report.backfills) console.log(`  ${b.id}: ${b.detail}`);
+    for (const w of report.warnings) console.warn(`  WARNING: ${w}`);
     console.log("Database schema is ready");
   } finally {
     await pool.end();

@@ -3,7 +3,7 @@ import { emptyViewConfig } from "./types";
 import { fallbackColor, newId } from "./fields";
 import { pruneConfig } from "./viewDefaults";
 
-const OPS: ReadonlySet<string> = new Set<FilterOp>(["contains", "notContains", "is", "isNot", "isEmpty", "isNotEmpty", "eq", "neq", "gt", "gte", "lt", "lte", "before", "after"]);
+const OPS: ReadonlySet<string> = new Set<FilterOp>(["between", "isAnyOf", "isNoneOf", "contains", "notContains", "is", "isNot", "isEmpty", "isNotEmpty", "eq", "neq", "gt", "gte", "lt", "lte", "before", "after"]);
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown, max = 200): string | undefined => (typeof v === "string" ? v.slice(0, max) : undefined);
@@ -28,6 +28,8 @@ export function normalizeViewConfig(raw: unknown, fields: FieldDef[]): ViewConfi
           field: f.field,
           op: f.op as FilterOp,
           value: typeof value === "string" ? value.slice(0, 500) : typeof value === "number" || typeof value === "boolean" ? value : null,
+          ...(typeof f.value2 === "string" ? { value2: f.value2.slice(0, 500) } : typeof f.value2 === "number" ? { value2: f.value2 } : {}),
+          ...(Array.isArray(f.values) ? { values: f.values.filter((v): v is string => typeof v === "string").slice(0, 200).map((v) => v.slice(0, 200)) } : {}),
         },
       ];
     });
@@ -49,6 +51,7 @@ export function normalizeViewConfig(raw: unknown, fields: FieldDef[]): ViewConfi
   if (isObj(input.form)) {
     const f = input.form;
     const form: FormConfig = {
+      category: f.category === "Vouchers" ? "Vouchers" : f.category === "Work" ? "Work" : undefined,
       title: str(f.title, 200) ?? "",
       description: str(f.description, 2000) ?? "",
       submitLabel: str(f.submitLabel, 60) || "Submit",
@@ -155,6 +158,11 @@ export function normalizeFieldOptions(type: FieldType, raw: unknown, existing: F
     default:
       break;
   }
+  // Settings that define how the field behaves are fixed when it is created and survive every edit.
+  if (existing.sequence) out.sequence = existing.sequence;
+  if (existing.managed) out.managed = existing.managed;
+  if (existing.pdfOnly) out.pdfOnly = true;
+  if (existing.defaultValue !== undefined) out.defaultValue = existing.defaultValue;
   return out;
 }
 

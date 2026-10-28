@@ -1,12 +1,11 @@
 "use client";
 
-import { ArrowDownAZ, ArrowUpAZ, EyeOff, Funnel, Layers, Plus, Settings2, Trash2, X } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, EyeOff, Funnel, Layers, Plus, Settings2, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { newId } from "@/lib/base/fields";
-import { opKind, defaultRule, opsFor, OPS_WITHOUT_VALUE } from "@/lib/base/query";
-import type { FieldDef, FieldType, FilterOp, FilterRule, GroupRule, SortRule, ViewConfig } from "@/lib/base/types";
+import { activeFilterCount } from "@/lib/base/query";
+import type { FieldDef, FieldType, GroupRule, SortRule, ViewConfig } from "@/lib/base/types";
 import { cn } from "@/lib/cn";
-import { linkCandidates } from "./inputs";
+import { FilterPanel } from "./FilterPanel";
 import { useTable } from "./TableProvider";
 import s from "./base.module.css";
 import { PanelButton } from "./ui";
@@ -32,118 +31,6 @@ function FieldSelect({ fields, value, onChange, label, allowNone }: { fields: Fi
         </option>
       ))}
     </select>
-  );
-}
-
-/* ------------------------------------------------------------------ filter */
-
-function ValueInput({ rule, field, onChange }: { rule: FilterRule; field: FieldDef; onChange: (v: string | boolean | number | null) => void }) {
-  const t = useTable();
-  const kind = opKind(field);
-  if (OPS_WITHOUT_VALUE.has(rule.op)) return <span className={s.valueSpacer} />;
-  if (kind === "boolean")
-    return (
-      <select className={s.miniSelect} aria-label="Value" value={String(rule.value === true || rule.value === "true")} onChange={(e) => onChange(e.target.value === "true")}>
-        <option value="true">checked</option>
-        <option value="false">unchecked</option>
-      </select>
-    );
-  if (kind === "select" || kind === "multi") {
-    const names = field.type === "computed" && field.options.computed?.fn === "stockStatus" ? ["In stock", "Low stock", "Out of stock"] : (field.options.choices?.map((c) => c.name) ?? []);
-    if (names.length > 0)
-      return (
-        <select className={s.miniSelect} aria-label="Value" value={String(rule.value ?? "")} onChange={(e) => onChange(e.target.value)}>
-          <option value="">Choose…</option>
-          {names.map((n) => (
-            <option key={n}>{n}</option>
-          ))}
-        </select>
-      );
-  }
-  if (kind === "link") {
-    const opts = linkCandidates(field, t.linked, []);
-    return (
-      <select className={s.miniSelect} aria-label="Value" value={String(rule.value ?? "")} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Choose…</option>
-        {opts.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    );
-  }
-  return <input className={s.miniInput} aria-label="Value" type={kind === "number" ? "number" : kind === "date" ? "date" : "text"} value={String(rule.value ?? "")} placeholder="Enter a value" onChange={(e) => onChange(e.target.value)} />;
-}
-
-function FilterPanel() {
-  const t = useTable();
-  const rules = t.config.filters;
-  const set = (next: FilterRule[]) => t.patchConfig({ filters: next });
-  const byKey = t.fieldMap;
-  const usable = t.fields;
-  return (
-    <div className={s.card}>
-      <h2 className={s.cardTitle}>Filter</h2>
-      <p className={s.muted}>{rules.length === 0 ? "No filters. Add one to narrow this view." : "In this view, show records"}</p>
-      <div className={s.rules}>
-        {rules.map((r, i) => {
-          const f = byKey.get(r.field);
-          return (
-            <div className={s.ruleRow} key={r.id}>
-              {i === 0 ? (
-                <span className={s.ruleLead}>Where</span>
-              ) : (
-                <select className={cn(s.miniSelect, s.ruleLead)} aria-label="Join" value={r.join} onChange={(e) => set(rules.map((x) => (x.id === r.id ? { ...x, join: e.target.value as "and" | "or" } : x)))}>
-                  <option value="and">and</option>
-                  <option value="or">or</option>
-                </select>
-              )}
-              <select
-                className={s.miniSelect}
-                aria-label="Field"
-                value={r.field}
-                onChange={(e) => {
-                  const nf = byKey.get(e.target.value);
-                  if (nf) set(rules.map((x) => (x.id === r.id ? { ...defaultRule(r.id, nf), join: r.join } : x)));
-                }}
-              >
-                {usable.map((x) => (
-                  <option key={x.key} value={x.key}>
-                    {x.name}
-                  </option>
-                ))}
-              </select>
-              {f && (
-                <>
-                  <select className={s.miniSelect} aria-label="Operator" value={r.op} onChange={(e) => set(rules.map((x) => (x.id === r.id ? { ...x, op: e.target.value as FilterOp } : x)))}>
-                    {opsFor(f).map((o) => (
-                      <option key={o.op} value={o.op}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ValueInput rule={r} field={f} onChange={(v) => set(rules.map((x) => (x.id === r.id ? { ...x, value: v } : x)))} />
-                </>
-              )}
-              <button type="button" className={s.iconBtn} aria-label="Remove condition" onClick={() => set(rules.filter((x) => x.id !== r.id))}>
-                <Trash2 size={14} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      <div className={s.cardFoot}>
-        <button type="button" className={s.linkBtn} onClick={() => t.fields[0] && set([...rules, defaultRule(newId("flt"), t.fields[0])])}>
-          <Plus size={14} /> Add condition
-        </button>
-        {rules.length > 0 && (
-          <button type="button" className={s.linkBtnMuted} onClick={() => set([])}>
-            Clear all
-          </button>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -318,7 +205,9 @@ export function Toolbar({ onAddField, right }: { onAddField: (type: FieldType) =
   const showData = type !== "form";
   const hiddenCount = c.hidden.length;
   const names = (keys: string[]) => keys.map((k) => t.fieldMap.get(k)?.name).filter(Boolean);
-  const filterFields = [...new Set(c.filters.map((f) => f.field))];
+  const activeRules = c.filters.filter((r) => t.fieldMap.has(r.field) && activeFilterCount([r], t.fields) > 0);
+  const activeFilters = activeRules.length;
+  const filterFields = [...new Set(activeRules.map((f) => f.field))];
   const icon = { size: 15, strokeWidth: 1.75 } as const;
 
   return (
@@ -329,9 +218,14 @@ export function Toolbar({ onAddField, right }: { onAddField: (type: FieldType) =
             <PanelButton width={280} label="Hide fields" trigger={({ open, ref, toggle }) => <Chip setRef={ref} open={open} onClick={toggle} active={hiddenCount > 0} icon={<EyeOff {...icon} />} label={hiddenCount === 0 ? "Hide fields" : plural(hiddenCount, "hidden field")} />}>
               {() => <FieldsPanel />}
             </PanelButton>
-            <PanelButton width={560} label="Filter" trigger={({ open, ref, toggle }) => <Chip setRef={ref} open={open} onClick={toggle} active={c.filters.length > 0} icon={<Funnel {...icon} />} label={c.filters.length === 0 ? "Filter" : `Filtered by ${names(filterFields).slice(0, 2).join(", ")}${filterFields.length > 2 ? ` +${filterFields.length - 2}` : ""}`} />}>
+            <PanelButton width={720} label="Filter" trigger={({ open, ref, toggle }) => <Chip setRef={ref} open={open} onClick={toggle} active={activeFilters > 0} icon={<Funnel {...icon} />} label={activeFilters === 0 ? "Filter" : `Filtered by ${names(filterFields).slice(0, 2).join(", ")}${filterFields.length > 2 ? ` +${filterFields.length - 2}` : ""}`} />}>
               {() => <FilterPanel />}
             </PanelButton>
+            {activeFilters > 0 && (
+              <button type="button" className={s.chipClear} aria-label="Clear all filters" title="Clear all filters" onClick={() => t.patchConfig({ filters: [] })}>
+                <X size={13} />
+              </button>
+            )}
             {(type === "grid" || type === "list" || type === "gallery" || type === "kanban") && (
               <PanelButton width={420} label="Group" trigger={({ open, ref, toggle }) => <Chip setRef={ref} open={open} onClick={toggle} active={c.groupBy.length > 0} icon={<Layers {...icon} />} label={c.groupBy.length === 0 ? "Group" : `Grouped by ${plural(c.groupBy.length, "field")}`} />}>
                 {() => <RuleList title="Group by" rules={c.groupBy} onChange={(r) => t.patchConfig({ groupBy: r })} fields={t.fields} empty="Records are not grouped." max={3} />}

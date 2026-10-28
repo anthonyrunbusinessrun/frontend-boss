@@ -58,6 +58,20 @@ export function validateRecordInput(fields: FieldDef[], input: Record<string, un
     const supplied = Object.prototype.hasOwnProperty.call(input, f.key);
     const required = f.required || opts.requiredKeys?.has(f.key) === true;
 
+    // Generated codes and system-managed files are never taken from the request body.
+    if (f.options.sequence) {
+      if (supplied && opts.mode === "update") errors[f.key] = `${f.name} is assigned automatically and cannot be changed.`;
+      continue;
+    }
+    if (f.options.managed === "system") {
+      if (supplied && opts.mode === "update") errors[f.key] = `${f.name} is created by the system and cannot be edited here.`;
+      continue;
+    }
+    if (f.options.managed === "upload" && opts.mode === "update") {
+      if (supplied) errors[f.key] = `${f.name} cannot be changed here. Use the dedicated upload action so the original is never replaced by accident.`;
+      continue;
+    }
+
     if (!supplied) {
       if (opts.mode === "create" && required && f.type !== "checkbox") errors[f.key] = requiredMessage(f);
       continue;
@@ -150,6 +164,7 @@ function coerce(f: FieldDef, raw: unknown): { value: unknown; error?: string } {
       for (const a of list) {
         if (!a.url.startsWith("/") || a.url.startsWith("//")) return { value: null, error: "Attachments must be uploaded files." };
         if (f.options.imagesOnly && a.type && !a.type.startsWith("image/")) return { value: null, error: "Only images are allowed in this field." };
+        if (f.options.pdfOnly && a.type !== "application/pdf") return { value: null, error: "Only PDF files are allowed in this field." };
         clean.push({ id: a.id, name: a.name.slice(0, 200), url: a.url, type: a.type, size: a.size });
       }
       return { value: clean };

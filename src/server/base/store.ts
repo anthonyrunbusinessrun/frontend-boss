@@ -5,6 +5,8 @@ import { TABLE_SLUGS, tableSeed } from "@/lib/base/definitions";
 import { FIELD_TYPE_INFO, newFieldKey, newId, primaryField, readAttachments } from "@/lib/base/fields";
 import { applyNodes, buildTree, treeToNodes, uniqueName, type LayoutNode } from "@/lib/base/layout";
 import { isBlank } from "@/lib/base/query";
+import { formatCode, isValidPrefix, nextFromMax } from "@/lib/base/sequence";
+import { buildRecordQuery, UnsupportedFilterError, type RecordQuery } from "./recordQuery";
 import { validateRecordInput, type FieldErrors } from "@/lib/base/validate";
 import { defaultConfigFor, pruneConfig } from "@/lib/base/viewDefaults";
 import { VIEW_TYPES, type FavoriteDef, type FieldDef, type FieldOptions, type FieldType, type LinkedTable, type RecordRow, type SectionDef, type TableBundle, type ViewAccess, type ViewConfig, type ViewDef, type ViewType } from "@/lib/base/types";
@@ -145,13 +147,25 @@ async function buildLinked(db: Db, fields: FieldDef[]): Promise<Record<string, L
   return out;
 }
 
+/** Above this many records a table is filtered, searched and sorted by the server instead of the browser. */
+export const serverQueryThreshold = () => {
+  const n = Number(process.env.BOSS_SERVER_QUERY_THRESHOLD ?? 3000);
+  return Number.isFinite(n) && n >= 0 ? n : 3000;
+};
+export const serverPage = () => {
+  const n = Number(process.env.BOSS_SERVER_PAGE ?? 200);
+  return Number.isInteger(n) && n >= 1 && n <= 1000 ? n : 200;
+};
+
 export async function getBundle(pool: Pool, slug: string, userId: string | null): Promise<TableBundle> {
   const table = assertTable(slug);
   const fields = await loadFields(pool, slug);
+  const count = Number((await pool.query<{ n: string }>("SELECT COUNT(*) AS n FROM boss_records WHERE section_slug = $1", [slug])).rows[0].n);
+  const serverMode = count > serverQueryThreshold();
   const [records, views, sections, favorites] = await Promise.all([
     pool.query<{ data: RecordRow }>(
       `SELECT r.data FROM boss_records r JOIN boss_groups g ON g.section_slug = r.section_slug AND g.group_id = r.group_id
-       WHERE r.section_slug = $1 ORDER BY g.position, r.position, r.record_id`,
+       WHERE r.section_slug = $1 ORDER BY g.position, r.position, r.record_id ${serverMode ? `LIMIT ${serverPage()}` : ""}`,
       [slug],
     ),
     pool.query<ViewRow>(`SELECT ${VIEW_COLUMNS} FROM boss_views WHERE table_slug = $1 AND (access <> 'personal' OR owner_id = $2) ORDER BY position, created_at, id`, [slug, userId]),
@@ -166,6 +180,9 @@ export async function getBundle(pool: Pool, slug: string, userId: string | null)
   const viewIds = new Set(viewRows.map((v) => v.id));
   return {
     table,
+    recordCount: count,
+    serverMode,
+    serverPage: serverPage(),
     fields,
     records: recordRows,
     views: viewRows,
@@ -195,6 +212,15 @@ async function checkRelations(db: Db, slug: string, fields: FieldDef[], values: 
         [slug, existing?.id ?? null, f.key, String(v)],
       );
       if (dup.rowCount) errors[f.key] = `“${String(v)}” is already used by another record.`;
+    }
+    if (f.type === "attachment" && f.options.pdfOnly) {
+      for (const a of Array.isArray(v) ? (v as Array<{ id?: string }>) : []) {
+        const file = a.id ? await db.query<{ mime: string }>("SELECT mime FROM boss_files WHERE id = $1", [a.id]) : null;
+        if (!file?.rowCount || file.rows[0].mime !== "application/pdf") {
+          errors[f.key] = "Upload a PDF file first.";
+          break;
+        }
+      }
     }
     if (f.type === "link" && f.options.linkTable) {
       const ids = linkIds(v);
@@ -228,6 +254,44 @@ async function nextAutonumber(client: PoolClient, slug: string, f: FieldDef): Pr
   return Number(res.rows[0].v);
 }
 
+/** Highest number in use by a sequence field, found by the database. */
+async function highestInUse(db: Db, slug: string, f: FieldDef): Promise<number | null> {
+  const seq = f.options.sequence!;
+  if (!isValidPrefix(seq.prefix)) throw new ApiError(500, "Invalid code prefix.");
+  const res = await db.query<{ m: string | null }>(
+    `SELECT MAX(substring(data->>$2 FROM $3::int)::numeric)::text AS m FROM boss_records WHERE section_slug = $1 AND data->>$2 ~ $4`,
+    [slug, f.key, seq.prefix.length + 1, `^${seq.prefix}[0-9]+$`],
+  );
+  return res.rows[0].m === null ? null : Number(res.rows[0].m);
+}
+
+/**
+ * Hands out the next code. Runs inside the table's write lock, so two people saving at the same moment get different
+ * numbers; the counter keeps the highest number ever issued, so a deleted record's code is never reused.
+ */
+async function issueCode(c: PoolClient, slug: string, f: FieldDef): Promise<string> {
+  const seq = f.options.sequence!;
+  const counter = await c.query<{ next_value: string }>("SELECT next_value FROM boss_counters WHERE table_slug = $1 AND key = $2 FOR UPDATE", [slug, f.key]);
+  const next = nextFromMax(await highestInUse(c, slug, f), counter.rowCount ? Number(counter.rows[0].next_value) : null);
+  await c.query(
+    `INSERT INTO boss_counters (table_slug, key, next_value) VALUES ($1, $2, $3::bigint + 1)
+     ON CONFLICT (table_slug, key) DO UPDATE SET next_value = EXCLUDED.next_value`,
+    [slug, f.key, next],
+  );
+  return formatCode(seq, next);
+}
+
+/** The code the next new record would get. Informational: it is not reserved, the server assigns the real one on save. */
+export async function peekCode(pool: Pool, slug: string, key: string): Promise<{ value: string }> {
+  assertTable(slug);
+  const fields = await loadFields(pool, slug);
+  const f = fields.find((x) => x.key === key && x.options.sequence);
+  if (!f) throw new ApiError(404, "That field does not have automatic codes.");
+  const counter = await pool.query<{ next_value: string }>("SELECT next_value FROM boss_counters WHERE table_slug = $1 AND key = $2", [slug, key]);
+  const next = nextFromMax(await highestInUse(pool, slug, f), counter.rowCount ? Number(counter.rows[0].next_value) : null);
+  return { value: formatCode(f.options.sequence!, next) };
+}
+
 export interface CreateRecordOptions {
   allowedKeys?: ReadonlySet<string>;
   requiredKeys?: ReadonlySet<string>;
@@ -237,10 +301,17 @@ export async function createRecord(pool: Pool, slug: string, input: Record<strin
   assertTable(slug);
   return tx(pool, slug, async (c) => {
     const fields = await loadFields(c, slug);
-    const { values, errors, ignored } = validateRecordInput(fields, input, { mode: "create", ...opts });
+    // Fields with a default (for example a form's category) use it when the request does not say.
+    const withDefaults: Record<string, unknown> = { ...input };
+    for (const f of fields) {
+      if (f.options.defaultValue !== undefined && !(f.key in withDefaults) && (!opts.allowedKeys || opts.allowedKeys.has(f.key))) withDefaults[f.key] = f.options.defaultValue;
+    }
+    const { values, errors, ignored } = validateRecordInput(fields, withDefaults, { mode: "create", ...opts });
     if (ignored.length > 0 && !opts.allowedKeys) throw new ApiError(422, `Unknown or read-only fields: ${ignored.join(", ")}.`, { ignored });
     if (Object.keys(errors).length > 0) fieldErrors(errors);
     await checkRelations(c, slug, fields, values, null);
+    // Generated codes come from the server only: a code typed or sent by the client is ignored.
+    for (const f of fields) if (f.options.sequence) values[f.key] = await issueCode(c, slug, f);
 
     const count = await c.query<{ n: number }>("SELECT COUNT(*)::int AS n FROM boss_records WHERE section_slug = $1", [slug]);
     if (count.rows[0].n >= MAX_RECORDS_PER_TABLE) throw new ApiError(409, "This table has reached its record limit.");
@@ -431,7 +502,7 @@ async function nextRootPosition(db: Db, slug: string): Promise<number> {
   return res.rows[0].p;
 }
 
-export async function createView(pool: Pool, slug: string, input: { name?: unknown; type?: unknown; access?: unknown; sectionId?: unknown; config?: unknown }, userId: string | null): Promise<ViewDef> {
+export async function createView(pool: Pool, slug: string, input: { name?: unknown; type?: unknown; access?: unknown; sectionId?: unknown; config?: unknown; category?: unknown }, userId: string | null): Promise<ViewDef> {
   const table = assertTable(slug);
   if (!userId) throw new ApiError(401, "No session.");
   if (typeof input.type !== "string" || !(VIEW_TYPES as readonly string[]).includes(input.type)) throw new ApiError(422, "Choose a view type.");
@@ -451,6 +522,10 @@ export async function createView(pool: Pool, slug: string, input: { name?: unkno
     const base = defaultConfigFor(type, fields, table.name);
     // Supplied settings override the defaults, but a value that was invalid (and so dropped) must not blank a default.
     const config = input.config === undefined ? base : mergeDefined(base, normalizeViewConfig(input.config, fields));
+    if (type === "form") {
+      const category = input.category === "Vouchers" || input.category === "Work" ? input.category : (config.form?.category ?? "Work");
+      config.form = { ...(config.form ?? base.form!), category };
+    }
     const position = sectionId
       ? (await c.query<{ p: number }>("SELECT COALESCE(MAX(position) + 1, 0)::int AS p FROM boss_views WHERE section_id = $1", [sectionId])).rows[0].p
       : await nextRootPosition(c, slug);
@@ -676,4 +751,28 @@ export async function getFile(pool: Pool, id: string) {
   if (!/^[a-z0-9]{6,40}$/.test(id)) return null;
   const res = await pool.query<{ name: string; mime: string; data: Buffer }>("SELECT name, mime, data FROM boss_files WHERE id = $1", [id]);
   return res.rows[0] ?? null;
+}
+
+/* ------------------------------------------------------------------- server query */
+
+function parseQuery(raw: Record<string, unknown>, fields: FieldDef[]): RecordQuery {
+  const cfg = normalizeViewConfig({ filters: raw.filters, sort: raw.sort }, fields);
+  const limit = typeof raw.limit === "number" ? raw.limit : serverPage();
+  const offset = typeof raw.offset === "number" ? raw.offset : 0;
+  return { filters: cfg.filters, sort: cfg.sort, search: typeof raw.search === "string" ? raw.search.slice(0, 200) : "", limit, offset };
+}
+
+/** Filtered, searched, sorted page of a table, computed by PostgreSQL. */
+export async function queryTable(pool: Pool, slug: string, raw: Record<string, unknown>): Promise<{ records: RecordRow[]; total: number }> {
+  assertTable(slug);
+  const fields = await loadFields(pool, slug);
+  const q = parseQuery(raw, fields);
+  try {
+    const built = buildRecordQuery(slug, fields, q);
+    const res = await pool.query<{ data: RecordRow; total: number }>(built.text, built.values);
+    return { records: res.rows.map((r) => r.data), total: res.rows[0]?.total ?? 0 };
+  } catch (e) {
+    if (e instanceof UnsupportedFilterError) throw new ApiError(422, e.message);
+    throw e;
+  }
 }

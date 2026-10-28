@@ -403,3 +403,85 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .barShort .barLabel { position: absolute; left: calc(100% + 6px); max-width: 260px; color: var(--text-body); font-weight: 500; }
 .dbMissing { margin: 60px auto; max-width: 520px; padding: 24px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-surface); line-height: 1.55; }
 .dbMissing code { color: var(--accent-cyan); }
+
+/* ---------- filter panel ---------- */
+.ruleRow2 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 2px 0; border-radius: 8px; }
+.ruleOver { outline: 2px dashed var(--accent-cyan); outline-offset: 2px; }
+.pickBtn { display: inline-flex; align-items: center; gap: 7px; height: 32px; min-width: 0; padding: 0 9px; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 6px; color: #fff; font-size: 12.5px; text-align: left; }
+.pickBtn:hover { border-color: #3a6aa8; }
+.pickBtn[aria-expanded="true"] { border-color: var(--accent-cyan); }
+.pickBtn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+.pickLabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickField { width: 190px; flex: none; }
+.pickOp { width: 150px; flex: none; }
+.pickWide { flex: 1; min-width: 150px; }
+.valueCell { display: flex; flex: 1 1 200px; min-width: 150px; align-items: center; }
+.valueCell > .miniInput, .valueCell > .miniSelect { width: 100%; height: 32px; }
+.rangeRow { display: flex; align-items: center; gap: 6px; width: 100%; }
+.rangeRow .miniInput { height: 32px; min-width: 0; }
+.rangeAnd { font-size: 12px; color: var(--text-secondary); }
+.optionActive { background: rgba(255,255,255,.07); }
+.dragHandle { cursor: grab; }
+.footLinks { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.chipClear { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: -4px; border-radius: 50%; color: var(--text-secondary); }
+.chipClear:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+/* ---------- active filter pills ---------- */
+.pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; margin-top: 10px; }
+.pillsLabel { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
+.pill { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 3px 4px 3px 10px; border: 1px solid rgba(0,236,252,.35); border-radius: 999px; background: var(--accent-cyan-bg); color: var(--accent-cyan); font-size: 12.5px; }
+.pillX { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: inherit; flex: none; }
+.pillX:hover { background: rgba(255,255,255,.14); color: #fff; }
+
+/* ---------- create launcher ---------- */
+.createTrigger { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 46px; padding: 6px 12px 6px 7px; background: linear-gradient(180deg, #11284a, #0d2040); border: 1px solid var(--border-subtle); border-radius: 12px; color: #fff; text-align: left; transition: border-color .12s, box-shadow .12s; }
+.createTrigger:hover, .createTrigger[aria-expanded="true"] { border-color: var(--brand-red); box-shadow: 0 0 0 3px rgba(207,14,56,.18); }
+.createTrigger:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+.createPlus { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--brand-red); color: #fff; flex: none; box-shadow: var(--shadow-glow-red); }
+.createText { display: flex; flex-direction: column; flex: 1; min-width: 0; line-height: 1.2; }
+.createTitle { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
+.createSub { font-size: 11px; color: var(--text-secondary); }
+.chevFlip { transform: rotate(180deg); }
+.launcherPanel { border-radius: 14px; }
+.launcher { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.launcherHead { margin: 0 2px 2px; font-size: 12.5px; color: var(--text-secondary); }
+.launcherHead strong { color: #fff; }
+.launcherGroup { margin: 8px 2px 0; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tile { --tile: #5aa2ff; position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 8px 10px 8px 8px; border: 1px solid var(--border-subtle); border-radius: 10px; background: rgba(255,255,255,.02); text-align: left; transition: background-color .1s, border-color .1s, transform .1s; }
+.tile::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tile); opacity: 0; transition: opacity .1s; }
+.tile:hover, .tile:focus-visible { background: rgba(255,255,255,.07); border-color: var(--tile); outline: none; }
+.tile:hover::before, .tile:focus-visible::before { opacity: 1; }
+.tile:active { transform: scale(.985); }
+.tileIcon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: color-mix(in srgb, var(--tile) 18%, transparent); flex: none; }
+.tileText { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.tileName { font-size: 13.5px; font-weight: 700; color: #fff; }
+.tileHint { font-size: 11.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheetBackdrop { position: fixed; inset: 0; z-index: 600; display: flex; align-items: flex-end; background: rgba(2,6,16,.7); }
+.sheet { width: 100%; max-height: 88vh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); border-radius: 18px 18px 0 0; border: 1px solid var(--border-subtle); background: var(--bg-surface); }
+.sheetGrip { width: 40px; height: 4px; margin: 8px auto 0; border-radius: 2px; background: var(--border-subtle); }
+.sheet .tiles { grid-template-columns: 1fr; }
+.sheet .tile { padding: 11px 12px 11px 10px; }
+@media (max-width: 420px) { .tiles { grid-template-columns: 1fr; } }
+
+/* ---------- form category tag ---------- */
+.catTag { flex: none; padding: 0 7px; border-radius: 999px; background: rgba(74,222,128,.14); color: #74e0a5; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; line-height: 17px; }
+.catTagVouchers { background: rgba(255,170,100,.16); color: #ffb26b; }
+.formCat { width: 100%; max-width: 640px; margin: 0; font-size: 12.5px; color: var(--text-secondary); }
+
+/* ---------- voucher documents ---------- */
+.docSummary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; font-size: 12.5px; color: var(--text-body); }
+.docRow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid var(--border-subtle); border-radius: 10px; background: #0c1830; }
+.docIcon { color: var(--accent-cyan); flex: none; }
+.docMain { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 1px; font-size: 13px; }
+.docMain strong { color: #fff; }
+.docName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-body); font-size: 12px; }
+.docNote { color: var(--text-secondary); font-size: 11.5px; line-height: 1.35; }
+.docActions { display: flex; align-items: center; gap: 2px; flex: none; flex-wrap: wrap; justify-content: flex-end; max-width: 180px; }
+.pdfFrame { width: 100%; height: 420px; border: 1px solid var(--border-subtle); border-radius: 8px; background: #fff; }
+.codeInput { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: .02em; background: #0a1730; color: var(--accent-cyan); cursor: default; }
+.loadMore { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; margin-top: 8px; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: #0b1427; font-size: 12.5px; color: var(--text-secondary); }
+.pdfWrap { width: 100%; max-height: 480px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 8px; background: #1a2336; padding: 8px; }
+.pdfPages { display: flex; flex-direction: column; gap: 8px; }
+.pdfPage { display: block; width: 100%; background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.pdfStatus { display: flex; align-items: center; gap: 8px; margin: 8px; font-size: 12.5px; color: var(--text-secondary); }

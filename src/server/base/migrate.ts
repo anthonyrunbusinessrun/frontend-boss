@@ -1,6 +1,8 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { Pool, PoolClient } from "pg";
 import { defaultFormConfig } from "@/lib/base/viewDefaults";
-import { TABLES, VOUCHER_START, seedViewConfig, type TableSeed } from "@/lib/base/definitions";
+import { TABLES, VOUCHER_DOCUMENT_KEYS, VOUCHER_START, seedViewConfig, type TableSeed } from "@/lib/base/definitions";
 import type { FieldDef } from "@/lib/base/types";
 
 /**
@@ -15,6 +17,8 @@ export interface MigrationReport {
   fieldsAdded: number;
   viewsAdded: number;
   backfills: Array<{ id: string; detail: string }>;
+  /** Things that could not be applied and need a person (for example duplicate codes blocking a unique index). */
+  warnings: string[];
 }
 
 async function once(client: PoolClient, id: string, run: () => Promise<string>, report: MigrationReport) {
@@ -192,6 +196,114 @@ async function backfills(client: PoolClient, report: MigrationReport) {
   if (items) await once(client, "v1:items-autonumber", async () => { await counterFor(client, "items", "n", 1); return "item counter ready"; }, report);
 }
 
+/**
+ * Views added to a table after its first release. Inserted once per view (recorded in boss_migrations), so a view the
+ * team later deletes or edits is never brought back or overwritten.
+ */
+async function applyLateViews(client: PoolClient, report: MigrationReport) {
+  for (const seed of TABLES) {
+    const exists = await client.query("SELECT 1 FROM boss_sections WHERE slug = $1", [seed.slug]);
+    if (!exists.rowCount) continue;
+    const existing = await client.query<{ n: number }>("SELECT COUNT(*)::int AS n FROM boss_views WHERE table_slug = $1", [seed.slug]);
+    if (existing.rows[0].n === 0) continue; // fresh table: `defaults:` already inserted every seed view
+    for (const v of seed.views) {
+      if (v.section) continue;
+      await once(
+        client,
+        `view:${seed.slug}:${v.key}`,
+        async () => {
+          const id = `view_${seed.slug}_${v.key}`;
+          const present = await client.query("SELECT 1 FROM boss_views WHERE id = $1", [id]);
+          if (present.rowCount) return "already present";
+          const pos = await client.query<{ p: number }>(
+            `SELECT COALESCE(MAX(p) + 1, 0)::int AS p FROM (SELECT position AS p FROM boss_views WHERE table_slug = $1 AND section_id IS NULL UNION ALL SELECT position FROM boss_nav_sections WHERE table_slug = $1) x`,
+            [seed.slug],
+          );
+          await client.query(
+            `INSERT INTO boss_views (id, table_slug, name, type, config, access, position) VALUES ($1, $2, $3, $4, $5::jsonb, 'collaborative', $6)
+             ON CONFLICT (id) DO NOTHING`,
+            [id, seed.slug, v.name, v.type, JSON.stringify(seedViewConfig(v)), pos.rows[0].p],
+          );
+          report.viewsAdded += 1;
+          return `added view “${v.name}”`;
+        },
+        report,
+      );
+    }
+  }
+}
+
+/** A unique index per generated code is the database-level guarantee behind the server's counter. */
+async function ensureSequenceIndexes(client: PoolClient, report: MigrationReport) {
+  for (const seed of TABLES) {
+    for (const f of seed.fields) {
+      if (!f.options?.sequence) continue;
+      const exists = await client.query("SELECT 1 FROM boss_sections WHERE slug = $1", [seed.slug]);
+      if (!exists.rowCount) continue;
+      if (!/^[a-z_]+$/.test(seed.slug) || !/^[A-Za-z]+$/.test(f.key)) continue; // constants from definitions.ts; belt and braces
+      await client.query("SAVEPOINT seq_index");
+      try {
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS boss_seq_${seed.slug}_${f.key} ON boss_records ((data->>'${f.key}')) WHERE section_slug = '${seed.slug}'`);
+        await client.query("RELEASE SAVEPOINT seq_index");
+      } catch (error) {
+        await client.query("ROLLBACK TO SAVEPOINT seq_index");
+        report.warnings.push(`Unique index for ${seed.slug}.${f.key} was not created (existing duplicate codes?): ${(error as Error).message}. The server still prevents new duplicates.`);
+      }
+    }
+  }
+}
+
+async function backfillsV2(client: PoolClient, report: MigrationReport) {
+  const has = async (slug: string) => (await client.query("SELECT 1 FROM boss_sections WHERE slug = $1", [slug])).rowCount;
+
+  if (await has("forms")) {
+    // Existing forms were all “Work” forms (the only style they had).
+    await once(
+      client,
+      "v2:forms-category-work",
+      async () => {
+        const r = await client.query(
+          `UPDATE boss_records SET data = data || '{"category":"Work"}'::jsonb, updated_at = NOW()
+           WHERE section_slug = 'forms' AND (NOT data ? 'category' OR data->>'category' IS NULL OR data->>'category' = '')`,
+        );
+        // Form views (the view type) get the same default category so none is left without one.
+        const v = await client.query(
+          `UPDATE boss_views SET config = jsonb_set(config, '{form,category}', '"Work"'::jsonb), updated_at = NOW()
+           WHERE type = 'form' AND config ? 'form' AND NOT (config->'form' ? 'category')`,
+        );
+        return `${r.rowCount} forms and ${v.rowCount} form views set to category Work`;
+      },
+      report,
+    );
+  }
+
+  if (await has("vouchers")) {
+    await once(
+      client,
+      "v2:voucher-document-defaults",
+      async () => {
+        // Vouchers before the PDF workflow were Bills of Lading with status Issued.
+        const r = await client.query(
+          `UPDATE boss_records SET data = data || jsonb_build_object('docType', COALESCE(NULLIF(data->>'docType', ''), 'BL'), 'docStatus', COALESCE(NULLIF(data->>'docStatus', ''), 'Issued')), updated_at = NOW()
+           WHERE section_slug = 'vouchers'`,
+        );
+        // The new document columns start hidden in the compact views, like the earlier detail fields.
+        const views = await client.query<{ id: string; config: { hidden?: string[]; key?: string } }>("SELECT id, config FROM boss_views WHERE table_slug = 'vouchers'");
+        let touched = 0;
+        for (const v of views.rows) {
+          const hide = v.config.key === "simplified" || v.config.key === "ledger";
+          if (!hide) continue;
+          const hidden = [...new Set([...(v.config.hidden ?? []), ...VOUCHER_DOCUMENT_KEYS])];
+          await client.query("UPDATE boss_views SET config = jsonb_set(config, '{hidden}', $2::jsonb), updated_at = NOW() WHERE id = $1", [v.id, JSON.stringify(hidden)]);
+          touched += 1;
+        }
+        return `${r.rowCount} vouchers typed BL / Issued; document columns hidden in ${touched} views`;
+      },
+      report,
+    );
+  }
+}
+
 /** Sample content for a freshly seeded database only (never applied to an existing one). */
 async function freshExtras(client: PoolClient) {
   const merge = (slug: string, id: string, data: Record<string, unknown>) =>
@@ -221,21 +333,75 @@ async function freshExtras(client: PoolClient) {
   const itemMeta: Record<string, [string, string]> = { i1: ["Feeding", "BF-0001"], i2: ["Feeding", "BF-0002"], i3: ["Feeding", "BF-0003"], i4: ["Diapering", "DP-0001"], i5: ["Feeding", "FD-0001"], i6: ["Hygiene", "HY-0001"], i7: ["Comfort", "CM-0001"], i8: ["Comfort", "CM-0002"], i9: ["Diapering", "DP-0002"], i10: ["Hygiene", "HY-0002"] };
   for (const [id, [category, sku]] of Object.entries(itemMeta)) await merge("items", id, { category, sku, unit: "each", reorderLevel: 100 });
 
-  // Vouchers: the document details shown in the Bill of Lading preview.
+  // Vouchers. v1 is the supplied FEMA / Infant & Toddler sample: its original PDF is stored and attached unchanged.
+  // v2 is a Bill of Lading without a PDF, so “Generate PDF” can be tried.
+  const terms = "Carrier accepts full responsibility for claim, loss, or damage occurring during transport. All applicable DOT regulations must be observed throughout the duration of haul. Hours of Service limitations must be communicated to shipper prior to or at time of dispatch. Failure to deliver the listed quantity, weight, or configuration may result in rate adjustment or claim deduction. Signed Proof of Delivery is required for freight payment.";
+  await merge("vouchers", "v1", {
+    docType: "FD",
+    docStatus: "Issued",
+    headline: "ASN - DELIVERED",
+    vsf: "VSF",
+    manifest: "I/T-015 · GREENCASTLE · Wipes",
+    accrualDate: "2026-07-09",
+    vendorCode: "FEMA-HQ",
+    vendorAccount: "Federal Emergency Management Agency\n500 C Street SW\nWashington, DC 20472",
+    contractNo: "70FB7026F00000036",
+    operatorCode: "DC-GRC",
+    operatedBy: "FEMA DC Greencastle\n12316 Molly Pitcher Hwy\nGreencastle, PA 17225\n(301) 874-4200",
+    deliverVia: "SAIA LTL Freight",
+    deliverPhone: "(609) 807-9228",
+    deliverPhone2: "800-456-7296",
+    resource: "LTL EXPRESS",
+    tracking: "5188241",
+    voucherNote: "",
+    terms,
+    manifestLines: "I/T-015 | I/T-015 · GREENCASTLE · Wipes | Diaper Baby Wipe Fragrance Free | 7/13/2026 | 10859120630",
+    packLines: "I/T-015 | 80 Wipes/Bag | 1 Pallet · 220 lbs · 40x48x55 | 24 | 1440 | FEMA DC GREENCASTLE / 12316 Molly Pitcher Highway / Greencastle, PA 17225",
+  });
+  try {
+    const bytes = await fs.readFile(path.join(process.cwd(), "db/samples/Voucher-LLG-FD-15574.pdf"));
+    const fileId = "samplevoucherfd15574";
+    await client.query(
+      "INSERT INTO boss_files (id, name, mime, size, data, uploaded_by) VALUES ($1, 'Voucher.pdf', 'application/pdf', $2, $3, 'seed') ON CONFLICT (id) DO NOTHING",
+      [fileId, bytes.length, bytes],
+    );
+    await merge("vouchers", "v1", { pdf: [{ id: fileId, name: "Voucher.pdf", url: `/api/files/${fileId}`, type: "application/pdf", size: bytes.length }] });
+  } catch {
+    /* the sample file is optional: without it the voucher simply has no original PDF */
+  }
   const address = "Land Logistics\n304 SW Suwannee Avenue\nBranford, Florida 32008\n(202) 875-2320";
-  const common = { vsf: "VSF", accrualDate: "2026-07-27", consignee: address, shipTo: address, deliverVia: "Total Quality Logistics", deliverPhone: "(513) 831-2600", resource: "FTL", terms: "Shipment is tendered in accordance with applicable regulations and contract requirements." };
-  await merge("vouchers", "v1", { ...common, manifest: "P/U - EMERALD PRODUCTS\nPallet of Baby Bottles, Nipples, and Wipes", tracking: "37702097", voucherNote: "Pick-up time: 7:00 AM to 4:30 PM\nPick-up date: 07/28/26" });
-  await merge("vouchers", "v2", { ...common, manifest: "D/O - LAND BRANFORD HQ\nPallet of Wipes", tracking: "37702098", voucherNote: "Delivery to Branford HQ dock." });
+  await merge("vouchers", "v2", {
+    docType: "BL",
+    docStatus: "Issued",
+    headline: "BILL OF LADING",
+    vsf: "VSF",
+    manifest: "D/O - LAND BRANFORD HQ · Pallet of Wipes",
+    accrualDate: "2026-07-27",
+    vendorCode: "LLG",
+    vendorAccount: address,
+    operatedBy: address,
+    deliverVia: "Total Quality Logistics",
+    deliverPhone: "(513) 831-2600",
+    resource: "FTL",
+    tracking: "37702098",
+    voucherNote: "Delivery to Branford HQ dock.",
+    terms: "Shipment is tendered in accordance with applicable regulations and contract requirements.",
+    manifestLines: "D/O | D/O - LAND BRANFORD HQ | Pallet of Wipes | 7/28/2026 | 37702098",
+    packLines: "D/O | 80 Wipes/Bag | 1 Pallet | 24 | 1440 | Land Logistics / 304 SW Suwannee Avenue / Branford, Florida 32008",
+  });
 }
 
 export async function applyBaseMigrations(pool: Pool, opts: { freshSeed?: boolean } = {}): Promise<MigrationReport> {
-  const report: MigrationReport = { tables: 0, fieldsAdded: 0, viewsAdded: 0, backfills: [] };
+  const report: MigrationReport = { tables: 0, fieldsAdded: 0, viewsAdded: 0, backfills: [], warnings: [] };
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext('boss-base-migrate'))");
     for (const seed of TABLES) await applyTable(client, seed, report);
     await backfills(client, report);
+    await applyLateViews(client, report);
+    await backfillsV2(client, report);
+    await ensureSequenceIndexes(client, report);
     // Autonumber counters for every table (fields added by an operator later get one on first use).
     for (const seed of TABLES) {
       for (const f of seed.fields) {

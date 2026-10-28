@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
-import { ApiError, applyLayout, createField, createRecord, createSection, createView, deleteField, deleteRecords, deleteSection, deleteView, duplicateView, getBundle, getFile, MAX_FILE_BYTES, renameSection, saveFile, setFavorite, submitForm, updateField, updateRecord, updateView } from "./store";
+import { ApiError, applyLayout, createField, createRecord, createSection, createView, deleteField, deleteRecords, deleteSection, deleteView, duplicateView, getBundle, getFile, MAX_FILE_BYTES, peekCode, queryTable, renameSection, saveFile, setFavorite, submitForm, updateField, updateRecord, updateView } from "./store";
+import { attachOriginalPdf, generateVoucher, removeGeneratedPdf } from "./voucherFiles";
 
 /**
  * Routes of `/api/base/*`, independent of Next so they can be tested against a real database.
@@ -65,13 +66,22 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
 
 const ok = (json: unknown, status = 200): ApiResponse => ({ status, json });
 
+/** The public address of this app, used inside generated documents (the QR code links back to the voucher). */
+export function appOrigin(request: Request): string {
+  const configured = process.env.BOSS_PUBLIC_URL?.replace(/\/+$/, "");
+  if (configured) return configured;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") ?? new URL(request.url).protocol.replace(":", "");
+  return host ? `${proto}://${host}` : new URL(request.url).origin;
+}
+
 export async function handleApi(pool: Pool, req: ApiRequest): Promise<ApiResponse> {
   const { method, segments, userId, request } = req;
   try {
     const mutating = method !== "GET" && method !== "HEAD";
     if (mutating && !hasWriteToken(request) && !isSameOriginRequest(request)) throw new ApiError(403, "Cross-site requests are not allowed.");
 
-    const [root, slug, resource, id, action] = segments;
+    const [root, slug, resource, id, action, extra] = segments;
 
     if (root === "session" && method === "POST") {
       if (userId) return ok({ userId });
@@ -104,7 +114,20 @@ export async function handleApi(pool: Pool, req: ApiRequest): Promise<ApiRespons
       throw new ApiError(405, "Method not allowed");
     }
 
+    // next automatic code (informational) and server-side filtering
+    if (resource === "next" && method === "GET" && id) return ok(await peekCode(pool, slug, id));
+    if (resource === "query" && method === "POST") return ok(await queryTable(pool, slug, await readJson(request)));
+
     // records
+    if (resource === "records" && id && id !== "delete" && action === "files" && extra && method === "POST") {
+      const form = await request.formData();
+      const file = form.get("file");
+      if (!(file instanceof File)) throw new ApiError(422, "Choose a file to upload.");
+      if (file.size > MAX_FILE_BYTES) throw new ApiError(413, "Files can be up to 5 MB.");
+      return ok(await attachOriginalPdf(pool, slug, id, extra, { name: file.name, bytes: Buffer.from(await file.arrayBuffer()) }, form.get("replace") === "true", uid), 201);
+    }
+    if (resource === "records" && id && action === "generate-pdf" && method === "POST" && slug === "vouchers") return ok(await generateVoucher(pool, id, appOrigin(request), uid), 201);
+    if (resource === "records" && id && action === "generated-pdf" && method === "DELETE" && slug === "vouchers") return ok(await removeGeneratedPdf(pool, id));
     if (resource === "records") {
       if (method === "POST" && !id) return ok(await createRecord(pool, slug, await readJson(request)), 201);
       if (method === "PATCH" && id) return ok(await updateRecord(pool, slug, id, await readJson(request)));
