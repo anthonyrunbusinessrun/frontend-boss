@@ -118,7 +118,7 @@ export function RecordEditor({ state, onChange, onClose, onSaved, renderExtra }:
   const duplicate = () => {
     if (!record) return;
     const preset: Record<string, unknown> = {};
-    for (const f of t.fields) if (isUserEditable(f, "create") && !f.options.unique && f.options.managed === undefined) preset[f.key] = record[f.key];
+    for (const f of t.fields) if (isUserEditable(f, "create") && !f.options.unique) preset[f.key] = record[f.key];
     onChange({ mode: "create", preset, title: `Copy of ${label ?? singular}` });
   };
 

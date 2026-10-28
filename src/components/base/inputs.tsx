@@ -117,7 +117,6 @@ export function AttachmentInput({ field, value, onChange, upload, id }: InputPro
       const added: AttachmentValue[] = [];
       for (const f of Array.from(files)) {
         if (field.options.imagesOnly && !f.type.startsWith("image/")) throw new Error(`“${f.name}” is not an image.`);
-        if (field.options.pdfOnly && f.type !== "application/pdf") throw new Error(`“${f.name}” is not a PDF.`);
         if (f.size > 5 * 1024 * 1024) throw new Error(`“${f.name}” is larger than 5 MB.`);
         added.push(await upload(f));
       }
@@ -157,7 +156,7 @@ export function AttachmentInput({ field, value, onChange, upload, id }: InputPro
       <button type="button" id={id} className={s.uploadBtn} disabled={busy} onClick={() => input.current?.click()}>
         <Upload size={14} aria-hidden /> {busy ? "Uploading…" : list.length ? "Add another file" : field.options.imagesOnly ? "Upload image" : "Upload file"}
       </button>
-      <input ref={input} type="file" hidden multiple={field.key !== "photo" && field.key !== "pic" && !field.options.pdfOnly} accept={field.options.imagesOnly ? "image/png,image/jpeg,image/gif,image/webp,image/avif" : field.options.pdfOnly ? "application/pdf" : undefined} onChange={(e) => void add(e.target.files)} />
+      <input ref={input} type="file" hidden multiple={field.key !== "photo" && field.key !== "pic"} accept={field.options.imagesOnly ? "image/png,image/jpeg,image/gif,image/webp,image/avif" : undefined} onChange={(e) => void add(e.target.files)} />
       {error && (
         <p className={s.fieldError} role="alert">
           {error}

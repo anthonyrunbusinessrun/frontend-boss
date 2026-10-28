@@ -213,15 +213,6 @@ async function checkRelations(db: Db, slug: string, fields: FieldDef[], values: 
       );
       if (dup.rowCount) errors[f.key] = `“${String(v)}” is already used by another record.`;
     }
-    if (f.type === "attachment" && f.options.pdfOnly) {
-      for (const a of Array.isArray(v) ? (v as Array<{ id?: string }>) : []) {
-        const file = a.id ? await db.query<{ mime: string }>("SELECT mime FROM boss_files WHERE id = $1", [a.id]) : null;
-        if (!file?.rowCount || file.rows[0].mime !== "application/pdf") {
-          errors[f.key] = "Upload a PDF file first.";
-          break;
-        }
-      }
-    }
     if (f.type === "link" && f.options.linkTable) {
       const ids = linkIds(v);
       const before = existing ? linkIds(existing[f.key]) : [];

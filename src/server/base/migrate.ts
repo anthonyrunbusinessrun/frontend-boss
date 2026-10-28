@@ -1,5 +1,3 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import type { Pool, PoolClient } from "pg";
 import { defaultFormConfig } from "@/lib/base/viewDefaults";
 import { TABLES, VOUCHER_DOCUMENT_KEYS, VOUCHER_START, seedViewConfig, type TableSeed } from "@/lib/base/definitions";
@@ -253,6 +251,21 @@ async function ensureSequenceIndexes(client: PoolClient, report: MigrationReport
   }
 }
 
+async function backfillsV3(client: PoolClient, report: MigrationReport) {
+  // Voucher PDFs are no longer created, uploaded or replaced by the app: every voucher shows the supplied Voucher.pdf.
+  // The three PDF fields from the previous release are removed from the field list. Values already stored in records
+  // (and any stored files) are kept in the database untouched.
+  await once(
+    client,
+    "v3:vouchers-remove-pdf-fields",
+    async () => {
+      const r = await client.query("DELETE FROM boss_fields WHERE table_slug = 'vouchers' AND key IN ('pdf', 'generatedPdf', 'pdfStatus')");
+      return `${r.rowCount} PDF field definitions removed (stored values kept)`;
+    },
+    report,
+  );
+}
+
 async function backfillsV2(client: PoolClient, report: MigrationReport) {
   const has = async (slug: string) => (await client.query("SELECT 1 FROM boss_sections WHERE slug = $1", [slug])).rowCount;
 
@@ -333,8 +346,7 @@ async function freshExtras(client: PoolClient) {
   const itemMeta: Record<string, [string, string]> = { i1: ["Feeding", "BF-0001"], i2: ["Feeding", "BF-0002"], i3: ["Feeding", "BF-0003"], i4: ["Diapering", "DP-0001"], i5: ["Feeding", "FD-0001"], i6: ["Hygiene", "HY-0001"], i7: ["Comfort", "CM-0001"], i8: ["Comfort", "CM-0002"], i9: ["Diapering", "DP-0002"], i10: ["Hygiene", "HY-0002"] };
   for (const [id, [category, sku]] of Object.entries(itemMeta)) await merge("items", id, { category, sku, unit: "each", reorderLevel: 100 });
 
-  // Vouchers. v1 is the supplied FEMA / Infant & Toddler sample: its original PDF is stored and attached unchanged.
-  // v2 is a Bill of Lading without a PDF, so “Generate PDF” can be tried.
+  // Vouchers. v1 carries the fields printed on the supplied FEMA / Infant & Toddler voucher; v2 is a Bill of Lading.
   const terms = "Carrier accepts full responsibility for claim, loss, or damage occurring during transport. All applicable DOT regulations must be observed throughout the duration of haul. Hours of Service limitations must be communicated to shipper prior to or at time of dispatch. Failure to deliver the listed quantity, weight, or configuration may result in rate adjustment or claim deduction. Signed Proof of Delivery is required for freight payment.";
   await merge("vouchers", "v1", {
     docType: "FD",
@@ -358,17 +370,6 @@ async function freshExtras(client: PoolClient) {
     manifestLines: "I/T-015 | I/T-015 · GREENCASTLE · Wipes | Diaper Baby Wipe Fragrance Free | 7/13/2026 | 10859120630",
     packLines: "I/T-015 | 80 Wipes/Bag | 1 Pallet · 220 lbs · 40x48x55 | 24 | 1440 | FEMA DC GREENCASTLE / 12316 Molly Pitcher Highway / Greencastle, PA 17225",
   });
-  try {
-    const bytes = await fs.readFile(path.join(process.cwd(), "db/samples/Voucher-LLG-FD-15574.pdf"));
-    const fileId = "samplevoucherfd15574";
-    await client.query(
-      "INSERT INTO boss_files (id, name, mime, size, data, uploaded_by) VALUES ($1, 'Voucher.pdf', 'application/pdf', $2, $3, 'seed') ON CONFLICT (id) DO NOTHING",
-      [fileId, bytes.length, bytes],
-    );
-    await merge("vouchers", "v1", { pdf: [{ id: fileId, name: "Voucher.pdf", url: `/api/files/${fileId}`, type: "application/pdf", size: bytes.length }] });
-  } catch {
-    /* the sample file is optional: without it the voucher simply has no original PDF */
-  }
   const address = "Land Logistics\n304 SW Suwannee Avenue\nBranford, Florida 32008\n(202) 875-2320";
   await merge("vouchers", "v2", {
     docType: "BL",
@@ -401,6 +402,7 @@ export async function applyBaseMigrations(pool: Pool, opts: { freshSeed?: boolea
     await backfills(client, report);
     await applyLateViews(client, report);
     await backfillsV2(client, report);
+    await backfillsV3(client, report);
     await ensureSequenceIndexes(client, report);
     // Autonumber counters for every table (fields added by an operator later get one on first use).
     for (const seed of TABLES) {

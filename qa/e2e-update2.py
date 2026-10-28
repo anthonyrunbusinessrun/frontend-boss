@@ -13,7 +13,7 @@ from playwright.sync_api import sync_playwright, expect
 BASE = os.environ.get("BOSS_URL", "http://localhost:3100")
 SERVER_BASE = os.environ.get("BOSS_URL_SERVER")
 CHROME = os.environ.get("CHROME_PATH", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
-SAMPLE_PDF = os.environ.get("SAMPLE_PDF", os.path.join(os.path.dirname(__file__), "..", "db", "samples", "Voucher-LLG-FD-15574.pdf"))
+SAMPLE_PDF = os.environ.get("SAMPLE_PDF", os.path.join(os.path.dirname(__file__), "..", "public", "vouchers", "Voucher.pdf"))
 RUN = str(int(time.time()))[-6:]
 results, console_errors = [], []
 
@@ -285,106 +285,63 @@ with sync_playwright() as p:
         sidebar().get_by_role("button", name=re.compile(r"^New Team Onboarding Form")).click(); expect(page.get_by_role("button", name="Submit")).to_be_visible()
     check("Forms: Form views have their own category (separate from view type); existing form views keep working", form_view_category)
 
-    # ====================================================================== 4. Voucher PDFs
+    # ====================================================================== 4. Voucher PDF (one supplied document)
     go("/vouchers"); view("VOUCHERS | Simplified")
     panel = lambda: page.get_by_role("complementary", name="Voucher tools")
     def ready(): expect(panel().locator("[data-testid=pdf-preview][data-state=ready]")).to_be_visible(timeout=15000)
-    def pdf_original_preview():
+    SIG = "c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0, ink = 0; for (let i = 0; i < d.length; i += 52) { h = (h * 31 + d[i]) >>> 0; if (d[i] < 120) ink++; } return [h, ink, c.width, c.height]; }"
+    def pdf_shown():
         ready(); assert panel().locator("[data-testid=pdf-preview] canvas").count() >= 1
-        assert "Voucher.pdf" in panel().inner_text() and "Original uploaded" in panel().inner_text()
-        assert "Not an original" not in panel().locator("[aria-label='Voucher PDF']").inner_text() or True
-        canvas_ok = panel().locator("canvas").first.evaluate("c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0; for (let i = 0; i < d.length; i += 52) if (d[i] < 120) ink++; return ink > 300; }")
-        assert canvas_ok, "the preview has drawn the document"
-    check("Vouchers: the uploaded sample PDF opens in a preview inside the app", pdf_original_preview)
+        assert "Voucher.pdf" in panel().inner_text()
+        h, ink, w, hgt = panel().locator("canvas").first.evaluate(SIG)
+        assert ink > 300, "the preview has drawn the document"
+        sigs["first"] = (h, ink, w, hgt)
+    sigs = {}
+    check("Vouchers: the supplied Voucher.pdf is displayed in the app", pdf_shown)
 
-    def pdf_download_and_retrieve():
-        link = panel().get_by_role("link", name="Download original PDF"); href = link.get_attribute("href"); assert href.endswith("?download=1")
+    def pdf_same_for_every_row():
+        sel = panel().get_by_label("Voucher", exact=True)
+        options = sel.locator("option").all()
+        assert len(options) >= 2
+        # a third voucher, created just now, must show the very same document
+        api("POST", "tables/vouchers/records", {"docType": "BL", "headline": "BILL OF LADING", "deliverVia": "Another carrier"})
+        page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]"); ready()
+        sel = panel().get_by_label("Voucher", exact=True)
+        n = sel.locator("option").count(); assert n >= 3, n
+        for i in range(n):
+            sel.select_option(index=i); page.wait_for_timeout(500); ready()
+            assert panel().locator("canvas").count() >= 1
+            assert tuple(panel().locator("canvas").first.evaluate(SIG)) == tuple(sigs["first"]), f"row {i} shows a different document"
+            assert "Voucher.pdf" in panel().inner_text()
+    check("Vouchers: every voucher row shows the same supplied PDF", pdf_same_for_every_row)
+
+    def pdf_download_unchanged():
+        link = panel().get_by_role("link", name="Download voucher PDF"); assert link.get_attribute("href") == "/vouchers/Voucher.pdf"
         with page.expect_download() as dl: link.click()
-        path = dl.value.path(); assert sha(open(path, "rb").read()) == sha(pdf_bytes), "the downloaded file is the original, byte for byte"
-        r = page.request.get(BASE + href.replace("?download=1", "")); assert r.status == 200 and r.headers["content-type"] == "application/pdf" and "inline" in r.headers["content-disposition"]
-        assert sha(r.body()) == sha(pdf_bytes)
-        assert panel().get_by_role("link", name="Open original PDF in a new tab").get_attribute("target") == "_blank"
-    check("Vouchers: download and retrieve the original PDF unchanged", pdf_download_and_retrieve)
+        assert dl.value.suggested_filename == "Voucher.pdf"
+        assert sha(open(dl.value.path(), "rb").read()) == sha(pdf_bytes), "the download is the supplied file, byte for byte"
+        r = page.request.get(BASE + "/vouchers/Voucher.pdf"); assert r.status == 200 and r.body()[:5] == b"%PDF-" and sha(r.body()) == sha(pdf_bytes)
+        assert panel().get_by_role("link", name="Open voucher PDF in a new tab").get_attribute("target") == "_blank"
+    check("Vouchers: open and download give back the supplied PDF unchanged", pdf_download_unchanged)
 
-    def pdf_upload_original():
-        panel().get_by_label("Voucher", exact=True).select_option(index=1); page.wait_for_timeout(600)
-        assert "None attached" in panel().inner_text()
-        panel().locator("input[type=file]").set_input_files(files=[{"name": f"received-{RUN}.pdf", "mimeType": "application/pdf", "buffer": pdf_bytes}])
-        expect(page.get_by_text("Original PDF uploaded").first).to_be_visible(); ready()
-        assert f"received-{RUN}.pdf" in panel().inner_text()
-    check("Vouchers: upload an original PDF to a voucher and preview it", pdf_upload_original)
-
-    def pdf_metadata_edit_keeps_original():
-        r = api("GET", "tables/vouchers")["records"]; v2 = [x for x in r if x["i"] == 11575][0]; before = v2["pdf"][0]["id"]
-        view("Voucher Details")
-        rows().filter(has_text="11575").get_by_role("button", name=re.compile("^Open record")).click()
-        d = page.get_by_role("dialog").last; d.get_by_role("button", name="Edit").click()
-        assert d.get_by_label("Original PDF").count() == 0, "the original is not editable in the record form"
-        d.get_by_label("Tracking").fill("U2-TRACK-" + RUN); d.get_by_role("button", name="Save changes").click()
-        expect(d.get_by_role("button", name="Edit")).to_be_visible(); page.keyboard.press("Escape"); page.wait_for_timeout(400)
-        after = [x for x in api("GET", "tables/vouchers")["records"] if x["i"] == 11575][0]
-        assert after["pdf"][0]["id"] == before and after["tracking"] == "U2-TRACK-" + RUN
-    check("Vouchers: editing voucher details keeps the original PDF", pdf_metadata_edit_keeps_original)
-
-    def pdf_replace_needs_confirmation():
-        view("VOUCHERS | Simplified"); panel().get_by_label("Voucher", exact=True).select_option(index=1); page.wait_for_timeout(500)
-        panel().get_by_role("button", name="Replace…").click()
-        ad = page.get_by_role("alertdialog"); expect(ad).to_contain_text("Replace the original PDF?")
-        ad.get_by_role("button", name="Cancel").click()
-        assert f"received-{RUN}.pdf" in panel().inner_text(), "cancelling changes nothing"
-        panel().get_by_role("button", name="Replace…").click()
-        with page.expect_file_chooser() as fc: page.get_by_role("alertdialog").get_by_role("button", name="Choose a PDF…").click()
-        fc.value.set_files(files=[{"name": f"replacement-{RUN}.pdf", "mimeType": "application/pdf", "buffer": pdf_bytes}])
-        expect(page.get_by_text("Original PDF replaced").first).to_be_visible(); assert f"replacement-{RUN}.pdf" in panel().inner_text()
-    check("Vouchers: replacing an original asks first and only happens when confirmed", pdf_replace_needs_confirmation)
-
-    def pdf_generate():
-        go("/vouchers"); view("VOUCHERS | Simplified")
-        v = api("POST", "tables/vouchers/records", {"docType": "BL", "headline": "BILL OF LADING", "accrualDate": "2026-10-20", "deliverVia": "E2E Carrier", "manifestLines": "D/O | E2E title | E2E description | 10/21/2026 | 777"})
-        page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
-        panel().get_by_label("Voucher", exact=True).select_option(label=re.sub(r"^", "", f"LLG-BL-{v['i'] + 4000}")); page.wait_for_timeout(500)
-        assert "No PDF" in panel().inner_text()
-        panel().get_by_role("button", name="Generate PDF").click()
-        expect(page.get_by_text("PDF generated from the saved data").first).to_be_visible(); ready()
-        txt = panel().inner_text(); assert "Generated PDF" in txt and "Not an original document" in txt and "Generated only" in txt
-        assert "(generated).pdf" in txt
-        dl_href = panel().get_by_role("link", name="Download generated PDF").get_attribute("href")
-        r = page.request.get(BASE + dl_href); assert r.status == 200 and r.body()[:5] == b"%PDF-" and "attachment" in r.headers["content-disposition"]
-        panel().get_by_role("button", name="Regenerate PDF").click(); expect(page.get_by_text("PDF regenerated").first).to_be_visible()
-        panel().get_by_role("button", name="Remove generated PDF").click(); expect(page.get_by_text("Generated PDF removed").first).to_be_visible()
-        assert "No PDF" in panel().inner_text()
-    check("Vouchers: generate a PDF from saved data, preview, download, regenerate and remove it", pdf_generate)
-
-    def pdf_generated_vs_original_kept_apart():
-        r = api("GET", "tables/vouchers")["records"]; v1 = [x for x in r if x["i"] == 11574][0]
-        before = v1["pdf"][0]["id"]
-        panel().get_by_label("Voucher", exact=True).select_option(index=0); page.wait_for_timeout(500)
-        panel().get_by_role("button", name="Generate PDF").click(); expect(page.get_by_text("PDF generated from the saved data").first).to_be_visible()
-        txt = panel().inner_text(); assert "Original PDF" in txt and "Generated PDF" in txt and "Original uploaded" in txt
-        tabs = panel().get_by_role("tab"); expect(tabs).to_have_count(2)
-        tabs.nth(1).click(); ready()
-        after = [x for x in api("GET", "tables/vouchers")["records"] if x["i"] == 11574][0]
-        assert after["pdf"][0]["id"] == before and after["generatedPdf"][0]["id"] != before
-    check("Vouchers: a generated PDF never replaces or hides the original (separate, labelled)", pdf_generated_vs_original_kept_apart)
-
-    def pdf_new_voucher_with_pdf():
+    def pdf_nothing_generated():
+        txt = panel().inner_text().lower()
+        for banned in ["generate pdf", "regenerate", "upload pdf", "replace", "generated pdf", "original pdf"]:
+            assert banned not in txt, banned
+        assert panel().get_by_role("button", name=re.compile(r"^(Generate PDF|Regenerate|Upload PDF|Replace)", re.I)).count() == 0
         page.get_by_role("button", name="New voucher").click(); d = page.get_by_role("dialog")
-        assert d.get_by_label("Generated PDF").count() == 0
-        assert d.get_by_label("Type", exact=True).input_value() == "FD"
-        d.get_by_label("Headline").fill("ASN - DELIVERED"); d.get_by_label("Original PDF").locator("xpath=..").locator("input[type=file]").set_input_files(files=[{"name": f"new-{RUN}.pdf", "mimeType": "application/pdf", "buffer": pdf_bytes}]) if d.get_by_label("Original PDF").count() else d.locator("input[type=file]").first.set_input_files(files=[{"name": f"new-{RUN}.pdf", "mimeType": "application/pdf", "buffer": pdf_bytes}])
-        expect(d.get_by_text(f"new-{RUN}.pdf")).to_be_visible(); d.get_by_role("button", name="Create voucher").click()
-        dd = page.get_by_role("dialog").last; expect(dd.get_by_role("button", name="Edit")).to_be_visible()
-        assert f"new-{RUN}.pdf" in dd.inner_text(); page.keyboard.press("Escape")
-        mine = [x for x in api("GET", "tables/vouchers")["records"] if x.get("pdf") and x["pdf"][0]["name"] == f"new-{RUN}.pdf"]; assert len(mine) == 1
-    check("Vouchers: a new voucher can be created with its original PDF attached", pdf_new_voucher_with_pdf)
+        for label in ["Original PDF", "Generated PDF"]: assert d.get_by_label(label).count() == 0, label
+        assert d.locator("input[type=file]").count() == d.locator("input[type=file][accept^='image']").count(), "the only file fields take images (QR, cover), never PDFs"
+        d.get_by_role("button", name="Cancel").click()
+        view("Voucher Details"); heads = " ".join(h.inner_text() for h in page.get_by_role("columnheader").all())
+        assert "Original PDF" not in heads and "Generated PDF" not in heads
+    check("Vouchers: no PDF is generated, uploaded or replaced anywhere", pdf_nothing_generated)
 
-    def pdf_rejects_bad_files():
-        panel().get_by_label("Voucher", exact=True).select_option(index=0); page.wait_for_timeout(300)
-        panel().get_by_role("button", name="Replace…").click(); 
-        with page.expect_file_chooser() as fc: page.get_by_role("alertdialog").get_by_role("button", name="Choose a PDF…").click()
-        fc.value.set_files(files=[{"name": "notes.txt", "mimeType": "text/plain", "buffer": b"hello"}])
-        expect(page.get_by_text("Choose a PDF file").first).to_be_visible()
-    check("Vouchers: non-PDF files are refused", pdf_rejects_bad_files)
+    def pdf_api_gone():
+        v = api("GET", "tables/vouchers")["records"][0]
+        r = page.request.post(BASE + f"/api/base/tables/vouchers/records/{v['id']}/generate-pdf", headers={"sec-fetch-site": "same-origin"})
+        assert r.status in (404, 405), r.status
+    check("Vouchers: the PDF generation endpoint no longer exists", pdf_api_gone)
 
     # ====================================================================== 5. Filtering
     go("/actions"); view("All Actions")

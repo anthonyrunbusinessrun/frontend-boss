@@ -140,7 +140,6 @@ export function useChoices(field: FieldDef | undefined): PickItem[] {
     if (field.type === "computed") {
       const fn = field.options.computed?.fn;
       if (fn === "stockStatus") return ["In stock", "Low stock", "Out of stock"].map((v) => ({ value: v, label: v }));
-      if (fn === "fileStatus") return ["Original uploaded", "Generated only", "No PDF"].map((v) => ({ value: v, label: v }));
     }
     const fromOptions = (field.options.choices ?? []).map((c) => ({ value: c.name, label: c.name }));
     if (field.type === "multiSelect") {

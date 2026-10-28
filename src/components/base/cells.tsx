@@ -8,7 +8,7 @@ import { formatDate } from "@/lib/dates";
 import s from "./base.module.css";
 import { Avatar, Chip, colorOf } from "./ui";
 
-const STOCK_COLOR = { "In stock": "green", "Low stock": "orange", "Out of stock": "red", "Original uploaded": "green", "Generated only": "orange", "No PDF": "gray" } as const;
+const STOCK_COLOR = { "In stock": "green", "Low stock": "orange", "Out of stock": "red" } as const;
 
 /** Read-only rendering of one field value. Used by grids, cards, lists and the drawer. */
 export function CellValue({ field, row, linked, compact }: { field: FieldDef; row: RecordRow; linked: LinkLookup; compact?: boolean }) {

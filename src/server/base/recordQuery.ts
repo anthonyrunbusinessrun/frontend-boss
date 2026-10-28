@@ -67,12 +67,7 @@ function valueExpr(f: FieldDef, p: Params): { sql: string; kind: "text" | "numbe
     const t = exprs({ ...f, key: spec.type }, p).text;
     return { sql: `(CASE WHEN ${n} IS NULL THEN NULL ELSE ${p.add(spec.prefix)} || COALESCE(NULLIF(${t}, ''), 'BL') || '-' || ((${n} + ${p.add(spec.offset)}::numeric)::bigint)::text END)`, kind: "text" };
   }
-  // fileStatus
-  const has = (key: string) => {
-    const j = `(r.data->${p.add(key)})`;
-    return `(CASE jsonb_typeof(${j}) WHEN 'array' THEN jsonb_array_length(${j}) > 0 WHEN 'string' THEN ${j} #>> '{}' <> '' ELSE false END)`;
-  };
-  return { sql: `(CASE WHEN ${has(spec.original)} THEN 'Original uploaded' WHEN ${has(spec.generated)} THEN 'Generated only' ELSE 'No PDF' END)`, kind: "text" };
+  throw new UnsupportedFilterError(`“${f.name}” cannot be filtered on large tables.`);
 }
 
 function isEmptySql(f: FieldDef, p: Params): string {

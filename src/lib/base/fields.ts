@@ -46,14 +46,10 @@ export const isEditableType = (type: FieldType) => FIELD_TYPE_INFO.find((t) => t
 
 /**
  * Whether a person can type into the field in the generic record form or a grid cell.
- * Sequence codes and system-managed attachments never can; "upload" attachments only while the record is created.
+ * Generated sequence codes, computed fields and autonumbers never can.
  */
-export function isUserEditable(field: FieldDef, mode: "create" | "update"): boolean {
-  if (!isEditableType(field.type)) return false;
-  if (field.options.sequence) return false;
-  if (field.options.managed === "system") return false;
-  if (field.options.managed === "upload" && mode === "update") return false;
-  return true;
+export function isUserEditable(field: FieldDef, _mode: "create" | "update"): boolean {
+  return isEditableType(field.type) && !field.options.sequence;
 }
 
 export function newId(prefix: string): string {
@@ -138,9 +134,4 @@ export function fieldByKey(fields: FieldDef[]): Map<string, FieldDef> {
 
 export function primaryField(fields: FieldDef[]): FieldDef | undefined {
   return fields.find((f) => f.primary) ?? fields[0];
-}
-
-/** The attachment value stored in a record for an uploaded file row. */
-export function attachmentFromRow(f: { id: string; name: string; url: string; type?: string; size?: number }): AttachmentValue {
-  return { id: f.id, name: f.name, url: f.url, type: f.type, size: f.size };
 }

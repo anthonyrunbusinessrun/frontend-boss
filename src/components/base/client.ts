@@ -77,28 +77,6 @@ export const api = {
 
   nextCode: (table: string, key: string) => send<{ value: string }>("GET", `tables/${table}/next/${key}`),
   query: (table: string, body: { filters: FilterRule[]; sort: SortRule[]; search: string; limit: number; offset: number }) => send<{ records: RecordRow[]; total: number }>("POST", `tables/${table}/query`, body),
-  generatePdf: (id: string) => send<RecordRow>("POST", "tables/vouchers/records/" + id + "/generate-pdf", {}),
-  removeGeneratedPdf: (id: string) => send<RecordRow>("DELETE", "tables/vouchers/records/" + id + "/generated-pdf"),
-
-  /** Attach (or, with `replace`, replace) the original PDF of a voucher. The server keeps the file byte for byte. */
-  async uploadOriginalPdf(table: string, id: string, key: string, file: File, replace: boolean): Promise<RecordRow> {
-    const attempt = async () => {
-      const form = new FormData();
-      form.set("file", file, file.name);
-      if (replace) form.set("replace", "true");
-      return fetch(`/api/base/tables/${table}/records/${id}/files/${key}`, { method: "POST", body: form });
-    };
-    let res = await attempt();
-    if (res.status === 401) {
-      sessionPromise = null;
-      await ensureSession();
-      res = await attempt();
-    }
-    const json = (await res.json().catch(() => ({}))) as RecordRow & { error?: string; code?: string };
-    if (!res.ok) throw new ClientError(res.status, json.error ?? "Upload failed.", undefined, json.code);
-    return json;
-  },
-
   async upload(file: File | Blob, name?: string): Promise<AttachmentValue> {
     const send1 = async () => {
       const form = new FormData();

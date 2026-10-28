@@ -42,7 +42,7 @@ const rule = (id: string, field: string, op: ViewConfig["filters"][number]["op"]
 export const VOUCHER_START = 11574;
 
 /** Fields that belong to the voucher document; hidden in the compact grid views. */
-export const VOUCHER_DOCUMENT_KEYS = ["headline", "docStatus", "pdf", "generatedPdf", "accrualDate", "vendorCode", "vendorAccount", "contractNo", "operatorCode", "operatedBy", "consignee", "shipTo", "deliverVia", "deliverPhone", "deliverPhone2", "resource", "tracking", "voucherNote", "terms", "manifestLines", "packLines"];
+export const VOUCHER_DOCUMENT_KEYS = ["headline", "docStatus", "accrualDate", "vendorCode", "vendorAccount", "contractNo", "operatorCode", "operatedBy", "consignee", "shipTo", "deliverVia", "deliverPhone", "deliverPhone2", "resource", "tracking", "voucherNote", "terms", "manifestLines", "packLines"];
 export const VOUCHER_LEGACY_KEYS = ["voucherId", "sp", "svc", "debit", "credit", "balance", "scans", "prefix", "label", "ref", "sum", "cover"];
 
 export const TABLES: TableSeed[] = [
@@ -161,14 +161,11 @@ export const TABLES: TableSeed[] = [
       { key: "vsf", name: "VSF", type: "singleSelect", options: sel(["VSF"], ["blue"]) },
       { key: "manifest", name: "Manifest", type: "longText", options: { help: "Short summary, for example “I/T-015 · GREENCASTLE · Wipes”." } },
       { key: "qr", name: "QR", type: "attachment", options: { imagesOnly: true } },
-      // --- the voucher document (fields of the supplied FEMA / Infant & Toddlers PDF) ---
+      // --- voucher document details (the fields printed on the supplied FEMA / Infant & Toddlers voucher) ---
       { key: "voucherNo", name: "Voucher No.", type: "computed", options: { computed: { fn: "voucherNo", number: "i", type: "docType", prefix: "LLG-", offset: 4000 } } },
       { key: "docType", name: "Type", type: "singleSelect", options: { ...sel(["FD", "BL"], ["blue", "orange"]), defaultValue: "FD", help: "FD = Freight Delivery Confirmation, BL = Bill of Lading." } },
       { key: "docStatus", name: "Status", type: "singleSelect", options: { ...sel(["Issued"], ["gray"]), defaultValue: "Issued" } },
       { key: "headline", name: "Headline", type: "text", options: { placeholder: "e.g. ASN - DELIVERED", help: "Text of the dark bar at the top of the voucher." } },
-      { key: "pdfStatus", name: "PDF", type: "computed", options: { computed: { fn: "fileStatus", original: "pdf", generated: "generatedPdf" } } },
-      { key: "pdf", name: "Original PDF", type: "attachment", options: { pdfOnly: true, managed: "upload", help: "The uploaded original. It is never replaced or edited by the app." } },
-      { key: "generatedPdf", name: "Generated PDF", type: "attachment", options: { pdfOnly: true, managed: "system", help: "Created by BOSS from the saved fields. Not an original document." } },
       { key: "accrualDate", name: "Accrual Date", type: "date" },
       { key: "vendorCode", name: "Vendor Account Code", type: "text", options: { placeholder: "e.g. FEMA-HQ" } },
       { key: "vendorAccount", name: "Vendor Account", type: "longText", options: { help: "Name and address, one line each." } },
@@ -208,8 +205,8 @@ export const TABLES: TableSeed[] = [
         config: {
           sort: [{ field: "i", dir: "asc" }],
           hidden: [...VOUCHER_DOCUMENT_KEYS, ...VOUCHER_LEGACY_KEYS],
-          order: ["i", "no", "vsf", "manifest", "qr", "voucherNo", "docType", "pdfStatus"],
-          widths: { i: 90, no: 100, vsf: 90, manifest: 240, qr: 120, voucherNo: 140, docType: 70, pdfStatus: 140 },
+          order: ["i", "no", "vsf", "manifest", "qr", "voucherNo", "docType"],
+          widths: { i: 90, no: 100, vsf: 90, manifest: 240, qr: 120, voucherNo: 140, docType: 70 },
         },
       },
       { key: "document", name: "Voucher Details", type: "grid", config: { sort: [{ field: "i", dir: "asc" }], hidden: [...VOUCHER_LEGACY_KEYS, "no", "vsf", "manifest", "qr", "consignee", "shipTo"] } },

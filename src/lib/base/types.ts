@@ -47,9 +47,7 @@ export type ComputedSpec =
   /** Reverse lookup: labels of the records in `table` whose link field `key` points at this record. */
   | { fn: "linkedFrom"; table: string; key: string }
   /** Voucher number such as LLG-FD-15574: prefix + document type + (autonumber + offset). */
-  | { fn: "voucherNo"; number: string; type: string; prefix: string; offset: number }
-  /** "Original uploaded", "Generated only" or "No PDF", from two attachment fields. */
-  | { fn: "fileStatus"; original: string; generated: string };
+  | { fn: "voucherNo"; number: string; type: string; prefix: string; offset: number };
 
 export interface FieldOptions {
   /** singleSelect / multiSelect */
@@ -81,14 +79,6 @@ export interface FieldOptions {
    * It is shown read-only and never changes afterwards.
    */
   sequence?: { prefix: string; pad?: number };
-  /**
-   * Attachment field that people cannot change through the generic record form after the record exists.
-   * "upload": may be attached when the record is created, later only through its dedicated action.
-   * "system": written by the server only (for example a generated PDF).
-   */
-  managed?: "upload" | "system";
-  /** attachment: only PDF files are accepted */
-  pdfOnly?: boolean;
   /** value used when a new record does not supply one */
   defaultValue?: string | number | boolean;
   /** attachment: only images are accepted */

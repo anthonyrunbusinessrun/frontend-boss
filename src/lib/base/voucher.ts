@@ -62,3 +62,9 @@ export function formatVoucherDate(iso: unknown): string {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return `${m}/${d}/${y}`;
 }
+
+/**
+ * The voucher document shown for every voucher: the PDF supplied with the project (public/vouchers/Voucher.pdf).
+ * The app does not create, edit, upload or replace voucher PDFs.
+ */
+export const VOUCHER_DOCUMENT = { url: "/vouchers/Voucher.pdf", name: "Voucher.pdf" } as const;

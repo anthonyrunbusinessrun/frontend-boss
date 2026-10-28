@@ -687,14 +687,14 @@ with sync_playwright() as p:
         assert [h for h in heads if h][:5] == ["I", "No", "VSF", "Manifest", "QR"], heads
         assert "VOUCHERS | Simplified" in page.locator("h1").inner_text()
         panel = page.get_by_role("complementary", name="Voucher tools")
-        expect(panel).to_contain_text("Original PDF")
+        expect(panel).to_contain_text("Voucher.pdf")
         expect(panel.locator("[data-testid=pdf-preview][data-state=ready]")).to_be_visible()
         panel.get_by_role("button", name=re.compile("^Run")).click()
         expect(page.get_by_text("Generated 2 QR codes").first).to_be_visible()
         page.wait_for_timeout(500)
         assert page.get_by_role("grid").get_by_role("row").nth(1).locator("img").count() >= 1
         expect(panel.get_by_role("button", name="Run (all up to date)")).to_be_visible()
-    check("Vouchers: reference layout (I, No, VSF, Manifest, QR), PDF preview, QR generator", vouchers)
+    check("Vouchers: reference layout (I, No, VSF, Manifest, QR), supplied PDF preview, QR generator", vouchers)
 
     def voucher_create_autonumber():
         n0 = page.get_by_role("grid").get_by_role("row").count()

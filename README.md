@@ -81,17 +81,13 @@ the table's write lock so simultaneous creates get different numbers, and backed
 (`boss_seq_<table>_<field>`). The side modal shows the next code immediately (`GET /tables/:t/next/:key`); it is not
 reserved. A code sent by a client is ignored and an existing code cannot be changed.
 
-### Voucher PDFs
+### Voucher PDF
 
-A voucher has an **Original PDF** and a **Generated PDF**, stored in two separate fields (`pdf`, `generatedPdf`).
-
-- The original is the uploaded file, byte for byte. It can be attached when the voucher is created or with
-  `POST /tables/vouchers/records/:id/files/pdf`; replacing an existing one needs `replace=true` (the UI asks first).
-  Editing voucher details never changes it, and the record form cannot edit it.
-- **Generate PDF** builds a PDF from the saved fields (`src/server/base/voucherPdf.ts`, laid out like the supplied sample) and
-  labels it as generated. It never replaces or hides the original. Long manifests continue on extra pages.
-- Both open in an in-app preview (pdf.js) and download unchanged (`/api/files/:id?download=1`).
-- Voucher number: `LLG-` + type (`FD` or `BL`) + (I + 4000). Manifest and pack rows are written one per line with ` | ` between columns.
+The Vouchers screen shows **one supplied document**: `public/vouchers/Voucher.pdf` (the FEMA / Infant & Toddler sample), for
+every voucher, whichever row is selected. It is displayed in the app (pdf.js), can be opened in a new tab and downloaded
+unchanged. The app does **not** generate, upload or replace voucher PDFs. To change the document, replace that file in
+the project. Voucher details (type, headline, vendor, operated by, deliver via, tracking, manifest rows…) are ordinary
+fields shown in the grid and the record drawer. Voucher number: `LLG-` + type (`FD` or `BL`) + (I + 4000).
 
 ### Filtering
 
@@ -141,7 +137,6 @@ Browser API (same-origin, session cookie), all under `/api/base`:
 | `PUT /tables/:t/favorites` | add / remove a favorite |
 | `GET /tables/:t/next/:key` | the next automatic code (informational) |
 | `POST /tables/:t/query` | server-side filter / search / sort / page of a table |
-| `POST /tables/vouchers/records/:id/files/pdf`, `…/generate-pdf`, `DELETE …/generated-pdf` | original upload (`replace=true` to replace), PDF generation |
 | `POST /files` | upload (images, PDF, text, Word, Excel; ≤ 5 MB; content is checked against its type) |
 
 The older token-protected `/api/records/*` and `/api/airtable/*` routes (used by `scripts/import-airtable.py`)
@@ -167,7 +162,6 @@ are unchanged.
 | `API_WRITE_TOKEN` | bearer token for scripts calling `/api/records` and `/api/base` writes |
 | `PGSSLMODE=require` | for providers whose public endpoint needs TLS |
 | `PG_POOL_MAX` | pool size (default 10) |
-| `BOSS_PUBLIC_URL` | public address of the app, used in generated documents (the QR code links back to the voucher). Defaults to the request's address |
 | `BOSS_SERVER_QUERY_THRESHOLD` | records above which a table is filtered on the server (default 3000) |
 | `BOSS_SERVER_PAGE` | records per page in that mode (default 200) |
 
@@ -184,10 +178,10 @@ details, voucher details) is added to **fresh databases only**.
 | --- | --- |
 | `src/lib/base/base.test.ts` | filters, sorting, grouping, search, computed fields, validation, view defaults, sidebar move / reorder logic |
 | `src/server/base/api.test.ts` | real PostgreSQL: migrations, CRUD, validation, uniqueness, link integrity, permissions, layout, favorites, forms, uploads |
-| `src/lib/base/features.test.ts`, `timeScale.test.ts` | sequence rules, managed (PDF) fields, voucher helpers, filter operators, timeline maths |
-| `src/server/base/features.test.ts` | real PostgreSQL: automatic codes (incl. 12 parallel creates), form categories, voucher PDF upload / generate / replace rules, server filtering parity with the browser |
+| `src/lib/base/features.test.ts`, `timeScale.test.ts` | sequence rules, voucher helpers, filter operators, timeline maths |
+| `src/server/base/features.test.ts` | real PostgreSQL: automatic codes (incl. 12 parallel creates), form categories, the fixed voucher PDF and removal of PDF generation, server filtering parity with the browser |
 | original suites | AIS accounting logic, table state, record forms |
-| `qa/e2e-update2.py` | browser: Create menu, automatic Code, voucher PDFs (preview, upload, replace, generate, download), form categories, filtering in every view type, server-side filtering |
+| `qa/e2e-update2.py` | browser: Create menu, automatic Code, the fixed voucher PDF (shown for every row, download, nothing generated), form categories, filtering in every view type, server-side filtering |
 | `qa/base-e2e.py` | browser: navigation, all view types, create / rename / duplicate / delete, sections and drag-and-drop, favorites, inline editing, fields, forms, Team Profile, Folio, Voucher, Items, Capabilities |
 
 See `NEEDS_CLARIFICATION.md` for assumptions and open questions.

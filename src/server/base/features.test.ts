@@ -3,12 +3,9 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
-import { PDFDocument } from "pdf-lib";
-import { fileStatus } from "@/lib/base/compute";
 import { applyFilters, applySort, matchesSearch } from "@/lib/base/query";
 import type { FilterRule, RecordRow, SortRule, TableBundle } from "@/lib/base/types";
-import { getFile } from "./store";
-import { createTestDb, makeCaller, makeUploader, USER_A } from "./testDb";
+import { createTestDb, makeCaller, USER_A } from "./testDb";
 
 /**
  * Integration tests for: automatic Code sequences, Forms category, voucher PDFs (original + generated) and
@@ -19,18 +16,16 @@ const skip = !ADMIN_URL;
 
 let db: Awaited<ReturnType<typeof createTestDb>>;
 let call: ReturnType<typeof makeCaller>;
-let upload: ReturnType<typeof makeUploader>;
 
 const sha = (b: Uint8Array | Buffer) => createHash("sha256").update(b).digest("hex");
 const bundle = async (t: string) => (await call("GET", `tables/${t}`)).json as TableBundle;
-const SAMPLE = path.join(process.cwd(), "db/samples/Voucher-LLG-FD-15574.pdf");
+const SUPPLIED_PDF = path.join(process.cwd(), "public/vouchers/Voucher.pdf");
 const newAction = (extra: Record<string, unknown> = {}) => call("POST", "tables/actions/records", { accrue: "2026-11-01", title: "Seq test", type: "Notice", status: "Queue", ...extra });
 
 describe("automatic codes, form categories, voucher PDFs and server filtering", { skip }, () => {
   before(async () => {
     db = await createTestDb(ADMIN_URL!);
     call = makeCaller(db.pool);
-    upload = makeUploader(db.pool);
   });
   after(async () => {
     await db?.drop();
@@ -158,114 +153,42 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     });
   });
 
-  describe("Voucher PDFs", () => {
-    it("the supplied sample is stored as the original of the sample voucher, byte for byte", async () => {
+  describe("Voucher PDF", () => {
+    it("the app serves exactly the supplied PDF, and it is a real PDF", async () => {
+      const bytes = await fs.readFile(SUPPLIED_PDF);
+      assert.equal(bytes.subarray(0, 5).toString("ascii"), "%PDF-");
+      assert.equal(sha(bytes), "bda904c2e151edb39260150445310b14523b7394c9a5881b6ad4fb278721eb56", "byte-for-byte the PDF that was supplied");
+      assert.ok(bytes.length > 100_000, "the full document, not a stub");
+    });
+
+    it("vouchers carry the document details but no per-voucher PDF fields", async () => {
       const b = await bundle("vouchers");
+      for (const gone of ["pdf", "generatedPdf", "pdfStatus"]) assert.ok(!b.fields.some((f) => f.key === gone), `${gone} was removed`);
+      for (const kept of ["voucherNo", "docType", "headline", "vendorAccount", "contractNo", "operatedBy", "deliverVia", "tracking", "manifestLines", "packLines"]) assert.ok(b.fields.some((f) => f.key === kept), kept);
       const v1 = b.records.find((r) => r.i === 11574)!;
-      const att = (v1.pdf as Array<{ id: string; name: string; url: string; type: string }>)[0];
-      assert.equal(att.name, "Voucher.pdf");
-      const stored = await getFile(db.pool, att.id);
-      const original = await fs.readFile(SAMPLE);
-      assert.equal(sha(stored!.data), sha(original));
       assert.equal(v1.docType, "FD");
-      assert.equal(fileStatus(v1.pdf, v1.generatedPdf), "Original uploaded");
+      assert.equal(v1.headline, "ASN - DELIVERED");
+      assert.equal(v1.contractNo, "70FB7026F00000036");
+      assert.equal("pdf" in v1, false, "no PDF is attached to individual vouchers");
     });
 
-    it("uploads an original PDF to a voucher without one; asks before replacing it", async () => {
-      const b = await bundle("vouchers");
-      const v2 = b.records.find((r) => r.i === 11575)!;
-      const pdf = await fs.readFile(SAMPLE);
-      const ok = await upload(`tables/vouchers/records/${v2.id}/files/pdf`, { name: "scan-1.pdf", type: "application/pdf", bytes: pdf });
-      assert.equal(ok.status, 201);
-      const first = ok.json.pdf[0];
-      assert.equal(first.name, "scan-1.pdf");
-      const again = await upload(`tables/vouchers/records/${v2.id}/files/pdf`, { name: "scan-2.pdf", type: "application/pdf", bytes: pdf });
-      assert.equal(again.status, 409);
-      assert.equal(again.json.code, "original-exists");
-      assert.equal(((await bundle("vouchers")).records.find((r) => r.id === v2.id)!.pdf as Array<{ id: string }>)[0].id, first.id, "the original was not replaced");
-      const replaced = await upload(`tables/vouchers/records/${v2.id}/files/pdf`, { name: "scan-3.pdf", type: "application/pdf", bytes: pdf }, { replace: "true" });
-      assert.equal(replaced.status, 201);
-      assert.equal(replaced.json.pdf[0].name, "scan-3.pdf");
-    });
-
-    it("rejects non-PDFs, spoofed PDFs, wrong tables and unmanaged fields", async () => {
-      const v2 = (await bundle("vouchers")).records.find((r) => r.i === 11575)!;
-      const path2 = `tables/vouchers/records/${v2.id}/files/pdf`;
-      assert.equal((await upload(path2, { name: "x.png", type: "image/png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]) }, { replace: "true" })).status, 415, "a PNG renamed to .pdf is not a PDF");
-      assert.equal((await upload(path2, { name: "fake.pdf", type: "application/pdf", bytes: new TextEncoder().encode("<html>not a pdf</html>") }, { replace: "true" })).status, 415);
-      assert.equal((await upload(`tables/vouchers/records/${v2.id}/files/qr`, { name: "a.pdf", type: "application/pdf", bytes: await fs.readFile(SAMPLE) })).status, 404, "only fields marked for uploads accept files");
-      assert.equal((await upload(`tables/profiles/records/x/files/photo`, { name: "a.pdf", type: "application/pdf", bytes: await fs.readFile(SAMPLE) })).status, 404);
-    });
-
-    it("editing voucher details never touches the original PDF, and the PDF fields cannot be edited through the record form", async () => {
-      const v1 = (await bundle("vouchers")).records.find((r) => r.i === 11574)!;
-      const before = JSON.stringify(v1.pdf);
-      const upd = await call("PATCH", `tables/vouchers/records/${v1.id}`, { tracking: "999", voucherNote: "edited", docStatus: "Issued" });
+    it("the app no longer generates, uploads or replaces voucher PDFs", async () => {
+      const v = (await bundle("vouchers")).records[0];
+      assert.equal((await call("POST", `tables/vouchers/records/${v.id}/generate-pdf`)).status, 404);
+      assert.equal((await call("DELETE", `tables/vouchers/records/${v.id}/generated-pdf`)).status, 404);
+      assert.ok((await bundle("vouchers")).records.some((r) => r.id === v.id), "a stray path suffix must never delete or change the record");
+      assert.equal((await call("PATCH", `tables/vouchers/records/${v.id}/whatever`, { tracking: "x" })).status, 404);
+      assert.equal((await call("DELETE", `tables/vouchers/fields/tracking/extra`)).status, 404);
+      const form = new FormData();
+      form.set("file", new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], "x.pdf", { type: "application/pdf" }));
+      const res = await (await import("./api")).handleApi(db.pool, { method: "POST", segments: ["tables", "vouchers", "records", v.id, "files", "pdf"], userId: USER_A, request: new Request("http://localhost/api/base/tables/vouchers/records/x/files/pdf", { method: "POST", headers: { "sec-fetch-site": "same-origin" }, body: form }) });
+      assert.equal(res.status, 404);
+      // saving voucher details works and never invents a document
+      const upd = await call("PATCH", `tables/vouchers/records/${v.id}`, { tracking: "T-1", voucherNote: "n" });
       assert.equal(upd.status, 200);
-      assert.equal(JSON.stringify(upd.json.pdf), before);
-      const hack = await call("PATCH", `tables/vouchers/records/${v1.id}`, { pdf: [] });
-      assert.equal(hack.status, 422);
-      assert.match(hack.json.fieldErrors.pdf, /dedicated upload action/);
-      assert.equal((await call("PATCH", `tables/vouchers/records/${v1.id}`, { generatedPdf: [] })).status, 422);
-      const created = await call("POST", "tables/vouchers/records", { docType: "FD", generatedPdf: [{ id: "x", name: "evil.pdf", url: "/api/files/x", type: "application/pdf" }] });
-      assert.equal(created.status, 201);
-      assert.deepEqual(created.json.generatedPdf, [], "a client cannot plant a generated document");
-    });
-
-    it("an original can be attached while creating a voucher, but only a real stored PDF is accepted", async () => {
-      const file = await upload("files", { name: "new.pdf", type: "application/pdf", bytes: await fs.readFile(SAMPLE) });
-      assert.equal(file.status, 201);
-      const ok = await call("POST", "tables/vouchers/records", { docType: "FD", pdf: [{ id: file.json.id, name: "new.pdf", url: file.json.url, type: "application/pdf" }] });
-      assert.equal(ok.status, 201);
-      const bad = await call("POST", "tables/vouchers/records", { docType: "FD", pdf: [{ id: "doesnotexist", name: "x.pdf", url: "/api/files/doesnotexist", type: "application/pdf" }] });
-      assert.equal(bad.status, 422);
-    });
-
-    it("generates a PDF from the saved data, keeps it separate from the original, and labels it as generated", async () => {
-      const v1 = (await bundle("vouchers")).records.find((r) => r.i === 11574)!;
-      const originalSha = sha((await getFile(db.pool, (v1.pdf as Array<{ id: string }>)[0].id))!.data);
-      const gen = await call("POST", `tables/vouchers/records/${v1.id}/generate-pdf`);
-      assert.equal(gen.status, 201);
-      const g = gen.json.generatedPdf[0];
-      assert.match(g.name, /^LLG-FD-15574 \(generated\)\.pdf$/);
-      assert.equal(gen.json.pdf[0].id, (v1.pdf as Array<{ id: string }>)[0].id, "the original attachment is untouched");
-      const stored = await getFile(db.pool, g.id);
-      assert.equal(stored!.mime, "application/pdf");
-      assert.notEqual(sha(stored!.data), originalSha, "the generated file is not a copy of the original");
-      assert.equal(sha((await getFile(db.pool, (v1.pdf as Array<{ id: string }>)[0].id))!.data), originalSha, "original bytes unchanged");
-      const parsed = await PDFDocument.load(stored!.data);
-      assert.equal(parsed.getPageCount(), 1);
-      assert.match(parsed.getTitle() ?? "", /generated/);
-      assert.match(parsed.getSubject() ?? "", /Not an original/);
-      assert.equal(fileStatus(gen.json.pdf, gen.json.generatedPdf), "Original uploaded", "an original always wins the status");
-    });
-
-    it("a voucher with only a generated PDF is reported as such, and the generated copy can be removed", async () => {
-      const created = (await call("POST", "tables/vouchers/records", { docType: "BL", headline: "BILL OF LADING", accrualDate: "2026-10-01" })).json;
-      const gen = await call("POST", `tables/vouchers/records/${created.id}/generate-pdf`);
-      assert.equal(fileStatus(gen.json.pdf, gen.json.generatedPdf), "Generated only");
-      const doc = await PDFDocument.load((await getFile(db.pool, gen.json.generatedPdf[0].id))!.data);
-      assert.equal(doc.getPageCount(), 1);
-      const removed = await call("DELETE", `tables/vouchers/records/${created.id}/generated-pdf`);
-      assert.deepEqual(removed.json.generatedPdf, []);
-      assert.equal(fileStatus(removed.json.pdf, removed.json.generatedPdf), "No PDF");
-      assert.equal((await call("POST", "tables/vouchers/records/nope/generate-pdf")).status, 404);
-      assert.equal((await call("POST", "tables/items/records/x/generate-pdf")).status, 404);
-    });
-
-    it("long manifests continue on extra pages instead of being cut off", async () => {
-      const lines = Array.from({ length: 14 }, (_, i) => `I/T-${100 + i} | Title ${i} | Description ${i} | 7/13/2026 | 1085912${i}`).join("\n");
-      const packs = Array.from({ length: 9 }, (_, i) => `I/T-${100 + i} | 80 Wipes/Bag | 1 Pallet | 24 | 1440 | DEST ${i} / Street ${i} / City, ST 1000${i}`).join("\n");
-      const v = (await call("POST", "tables/vouchers/records", { docType: "FD", manifestLines: lines, packLines: packs })).json;
-      const gen = await call("POST", `tables/vouchers/records/${v.id}/generate-pdf`);
-      const doc = await PDFDocument.load((await getFile(db.pool, gen.json.generatedPdf[0].id))!.data);
-      assert.ok(doc.getPageCount() >= 2, `expected continuation pages, got ${doc.getPageCount()}`);
-    });
-
-    it("text outside the font's alphabet cannot break generation", async () => {
-      const v = (await call("POST", "tables/vouchers/records", { docType: "FD", deliverVia: "Transport 日本 ✓ — “quotes”", headline: "ÅÄÖ ñ" })).json;
-      const gen = await call("POST", `tables/vouchers/records/${v.id}/generate-pdf`);
-      assert.equal(gen.status, 201);
+      assert.equal("generatedPdf" in upd.json, false);
+      const planted = await call("PATCH", `tables/vouchers/records/${v.id}`, { pdf: [{ id: "x", name: "x.pdf", url: "/api/files/x", type: "application/pdf" }] });
+      assert.equal(planted.status, 422, "unknown fields are refused");
     });
   });
 
@@ -323,7 +246,6 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
       await parity("capabilities", [rule("area", "isAnyOf", { values: ["System", "Exception"] })]);
       await parity("capabilities", [rule("go", "is", { value: true }), rule("area", "is", { value: "System" })]);
       await parity("vouchers", [rule("voucherNo", "contains", { value: "FD" })]);
-      await parity("vouchers", [rule("pdfStatus", "is", { value: "Original uploaded" })]);
       await parity("vouchers", [rule("no", "between", { value: 12574, value2: 12575 })]);
       await parity("concepts", [rule("work", "contains", { value: "x" })]);
     });

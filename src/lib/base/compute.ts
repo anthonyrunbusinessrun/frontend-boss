@@ -23,15 +23,6 @@ export function voucherNumber(spec: { number: string; type: string; prefix: stri
   return `${spec.prefix}${type}-${n + spec.offset}`;
 }
 
-export type FileStatus = "Original uploaded" | "Generated only" | "No PDF";
-
-/** The original upload always wins: a generated copy never hides or replaces it. */
-export function fileStatus(original: unknown, generated: unknown): FileStatus {
-  if (readAttachments(original).length > 0) return "Original uploaded";
-  if (readAttachments(generated).length > 0) return "Generated only";
-  return "No PDF";
-}
-
 export function toNumber(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : Number(String(v).replace(/[$,%\s]/g, ""));
@@ -54,7 +45,6 @@ export function fieldValue(field: FieldDef, row: RecordRow, linked: LinkLookup =
   }
   if (spec.fn === "stockStatus") return stockStatus(row[spec.qty], row[spec.reorder]);
   if (spec.fn === "voucherNo") return voucherNumber(spec, row);
-  if (spec.fn === "fileStatus") return fileStatus(row[spec.original], row[spec.generated]);
   return null;
 }
 

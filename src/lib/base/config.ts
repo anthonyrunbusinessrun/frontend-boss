@@ -160,8 +160,6 @@ export function normalizeFieldOptions(type: FieldType, raw: unknown, existing: F
   }
   // Settings that define how the field behaves are fixed when it is created and survive every edit.
   if (existing.sequence) out.sequence = existing.sequence;
-  if (existing.managed) out.managed = existing.managed;
-  if (existing.pdfOnly) out.pdfOnly = true;
   if (existing.defaultValue !== undefined) out.defaultValue = existing.defaultValue;
   return out;
 }

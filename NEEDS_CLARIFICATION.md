@@ -54,10 +54,10 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 - Columns follow the screenshot: **I** (autonumber, starts at 11574), **No** (= I + 1000), **VSF**, **Manifest**, **QR**.
 - *VSF* is modeled as a single select with one option (“VSF”) because the meaning is not visible. *Manifest* is long
   text (one line per shipment line); the screenshot suggests it may link to a Manifest table that does not exist here.
-- The Bill of Lading preview/print uses extra fields (accrual date, consignee, ship to, deliver via, resource,
-  tracking, note, terms), hidden in the “Simplified” view. The voucher number is `LLG-BL-` + (I + 4000), from
-  I 11578 → LLG-BL-15578 in the screenshot. The letterhead (Land Logistics) is in
-  `src/components/base/vouchers/voucherConfig.ts`.
+- Extra fields hold the details printed on a voucher (accrual date, vendor account, operated by, deliver via, resource,
+  tracking, note, terms, manifest rows), hidden in the “Simplified” view. The voucher number is `LLG-` + type + (I + 4000):
+  I 11574 with type FD gives `LLG-FD-15574`, as on the supplied PDF. The earlier HTML “Bill of Lading” preview was replaced
+  by the supplied `Voucher.pdf` (see section 10).
 - **QR codes** encode a link to the voucher in this app (`/vouchers?record=…`). The “Run” button generates a QR
   image for vouchers without one and stores it as an attachment.
 - The previous ledger fields (Voucher ID, SP, SVC, Debit, Credit, Balance, Scans, Prefix, Label, ID, Sum, Cover)
@@ -107,15 +107,12 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 - Existing codes are untouched. The unique index is created by the migration; if an existing database already has duplicate
   codes the migration prints a warning and skips the index (the server still blocks new duplicates).
 
-**Voucher PDFs.**
-- `Voucher.pdf` is an image-only Figma export with no text layer, so its fields were read from the picture.
-- The L (FD) and R (BL) marks are tied to the document type because the two samples show it; confirm what they mean.
-- Types: FD = Freight Delivery Confirmation (the supplied PDF), BL = Bill of Lading (the earlier sample). Existing vouchers became BL / Issued.
-- Manifest and pack rows are text, one row per line, columns separated by ` | `; use `/` for a new line in a destination.
-- The generated PDF follows the reference's proportions and positions but uses a free look-alike font (Saira Semi Condensed)
-  and a redrawn logo. It carries a footer saying it was generated and is not an original document.
-- Replacing an original leaves the old file stored in the database but unattached.
-- Preview shows up to 8 pages; PDFs are limited to 5 MB.
+**Voucher PDF.**
+- Every voucher shows the one supplied `Voucher.pdf` (`public/vouchers/Voucher.pdf`). The app does not generate, upload or replace voucher PDFs,
+  and the PDF fields of the previous release (`Original PDF`, `Generated PDF`, `PDF`) were removed from the field list (values already stored are kept).
+- `Voucher.pdf` is an image-only Figma export with no text layer, so the voucher detail fields were read from the picture.
+  They are ordinary fields; nothing fills the PDF from them. Types: FD = Freight Delivery Confirmation (the supplied PDF), BL = Bill of Lading.
+- The preview shows up to 8 pages.
 
 **Forms category.** Work / Vouchers exists on form records (Forms table) and on Form *views* (builder, create dialog, sidebar tag).
 Existing forms and form views were set to Work.

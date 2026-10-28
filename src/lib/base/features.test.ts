@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fileStatus, voucherNumber as computedVoucherNo } from "./compute";
+import { voucherNumber as computedVoucherNo } from "./compute";
 import { choicesFromNames, isUserEditable } from "./fields";
 import { activeFilterCount, applyFilters, defaultRule, describeRule, isIncomplete, opsFor } from "./query";
 import { formatCode, isValidPrefix, nextFromMax, nextNumber, parseCode } from "./sequence";
 import type { FieldDef, FilterRule, RecordRow } from "./types";
 import { validateRecordInput } from "./validate";
-import { MANIFEST_COLUMNS, PACK_COLUMNS, formatVoucherDate, joinRows, parseRows, voucherNumber } from "./voucher";
+import { MANIFEST_COLUMNS, PACK_COLUMNS, VOUCHER_DOCUMENT, formatVoucherDate, joinRows, parseRows, voucherNumber } from "./voucher";
 
 const f = (key: string, type: FieldDef["type"], extra: Partial<FieldDef> = {}): FieldDef => ({ key, name: key, type, options: {}, position: 0, required: false, primary: false, ...extra });
 const rule = (field: string, op: FilterRule["op"], extra: Partial<FilterRule> = {}): FilterRule => ({ id: field + op, join: "and", field, op, ...extra });
@@ -52,38 +52,8 @@ describe("sequential codes", () => {
     const updated = validateRecordInput([code, title], { code: "HACK" }, { mode: "update" });
     assert.match(updated.errors.code, /assigned automatically/);
     assert.equal(isUserEditable(code, "create"), false);
+    assert.equal(isUserEditable(code, "update"), false);
     assert.equal(isUserEditable(title, "create"), true);
-  });
-});
-
-describe("managed (PDF) fields", () => {
-  const pdf = f("pdf", "attachment", { options: { pdfOnly: true, managed: "upload" } });
-  const gen = f("generatedPdf", "attachment", { options: { pdfOnly: true, managed: "system" } });
-  const file = { id: "a", name: "v.pdf", url: "/api/files/a", type: "application/pdf" };
-
-  it("an original can be attached at creation but not changed through the record form", () => {
-    assert.deepEqual(validateRecordInput([pdf], { pdf: [file] }, { mode: "create" }).errors, {});
-    assert.match(validateRecordInput([pdf], { pdf: [] }, { mode: "update" }).errors.pdf, /dedicated upload action/);
-    assert.equal(isUserEditable(pdf, "create"), true);
-    assert.equal(isUserEditable(pdf, "update"), false);
-  });
-
-  it("a generated file can never come from the client", () => {
-    const create = validateRecordInput([gen], { generatedPdf: [file] }, { mode: "create" });
-    assert.equal("generatedPdf" in create.values, false);
-    assert.ok(validateRecordInput([gen], { generatedPdf: [] }, { mode: "update" }).errors.generatedPdf);
-    assert.equal(isUserEditable(gen, "create"), false);
-  });
-
-  it("only PDF files are accepted", () => {
-    assert.ok(validateRecordInput([pdf], { pdf: [{ ...file, type: "image/png" }] }, { mode: "create" }).errors.pdf);
-  });
-
-  it("the original always wins the status", () => {
-    assert.equal(fileStatus([file], [file]), "Original uploaded");
-    assert.equal(fileStatus([], [file]), "Generated only");
-    assert.equal(fileStatus(undefined, undefined), "No PDF");
-    assert.equal(fileStatus("legacy.pdf", null), "Original uploaded");
   });
 });
 
@@ -94,6 +64,10 @@ describe("voucher document helpers", () => {
     assert.equal(voucherNumber({ id: "x", i: 11575 }), "LLG-BL-15575", "legacy vouchers are Bills of Lading");
     assert.equal(voucherNumber({ id: "x" }), "");
     assert.equal(computedVoucherNo({ number: "i", type: "docType", prefix: "LLG-", offset: 4000 }, { id: "x", i: 11574, docType: "FD" }), "LLG-FD-15574");
+  });
+
+  it("always points at the one supplied voucher PDF", () => {
+    assert.deepEqual(VOUCHER_DOCUMENT, { url: "/vouchers/Voucher.pdf", name: "Voucher.pdf" });
   });
 
   it("formats dates as printed on the voucher", () => {
