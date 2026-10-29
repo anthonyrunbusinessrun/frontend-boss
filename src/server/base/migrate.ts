@@ -432,7 +432,7 @@ async function backfillsV5(client: PoolClient, report: MigrationReport) {
                '{widths}', $4::jsonb
              ),
              updated_at = NOW()
-           WHERE table_slug = 'vouchers' AND (id = 'view_vouchers_simplified' OR config->>'key' = 'simplified')`,
+           WHERE table_slug = 'vouchers' AND (id = $1::text OR config->>'key' = 'simplified')`,
           [
             "view_vouchers_simplified",
             JSON.stringify(config.order ?? [...VOUCHER_FEMA_ORDER]),
