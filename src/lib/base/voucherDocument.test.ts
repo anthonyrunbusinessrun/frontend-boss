@@ -59,7 +59,13 @@ describe("voucher document: what is printed for each sample voucher", () => {
     assert.deepEqual([d.ref1, d.ref2], ["70FB7026F00000036", "37702097"]);
     assert.deepEqual(d.via, [{ text: "Total Quality Logistics", bold: true }, { text: "(513) 831-2600" }], "no second phone on a Bill of Lading");
     assert.deepEqual([d.resource, d.tracking], ["FTL", "37702097"]);
-    assert.deepEqual(d.note, [{ text: "Total Quality Logistics (TQL)", bold: true }]);
+    assert.deepEqual(d.note, [
+      { text: "Total Quality Logistics (TQL)", bold: true },
+      { label: "Phone Number:", text: "(513) 831-2600" },
+      { label: "Est. Price of Delivery:", text: "$3,750.00" },
+      { label: "Pick-up time:", text: "7:00 AM to 4:30 PM" },
+      { label: "Pick-up date:", text: "07/28/26" },
+    ]);
     assert.deepEqual(d.manifest.map((m) => m[1]), ["P/U - EMERALD PRODUCTS", "Pallet of Baby Bottles, Nipples, and Wipes", "D/O - LAND BRANFORD HQ"]);
     assert.equal(d.terms[0], "Shipment is tendered in accordance with applicable");
     assert.ok(d.terms.includes(""), "paragraphs are separated by a blank line");
@@ -80,7 +86,12 @@ describe("voucher document: what is printed for each sample voucher", () => {
     assert.deepEqual([d.ref1, d.ref2], ["Airline Sales Order:", "Airline Booking #:"]);
     assert.deepEqual(d.via.map((l) => l.text), ["VIA FREE ENTRY", "VIA FREE ENTRY", "VIA FREE ENTRY"]);
     assert.deepEqual([d.resource, d.tracking], ["TRANSPORTATION", "TRACKING #"]);
-    assert.deepEqual(d.note, [{ label: "Company:", text: "ABC Company" }]);
+    assert.deepEqual(d.note, [
+      { label: "Company:", text: "ABC Company" },
+      { label: "Sales Person:", text: "XYZ" },
+      { label: "Contact Number:", text: "+ 1 000 000" },
+      { label: "Date Issued:", text: "00/00/00" },
+    ]);
     assert.equal(d.manifest[0][1], "QUOTE REQUESTED:");
     assert.equal(d.manifest.length, 5);
     assert.equal(d.terms[0], "This document is provided for informational and");
@@ -95,7 +106,13 @@ describe("voucher document: what is printed for each sample voucher", () => {
     assert.equal(d.ref2, "5753602");
     assert.equal(d.manifest.length, 6);
     assert.equal(d.manifest[0][1], "P/U - LAND BRANFORD HQ");
-    assert.deepEqual(d.note, [{ text: "SAIA LTL Freight", bold: true }]);
+    assert.deepEqual(d.note, [
+      { text: "SAIA LTL Freight", bold: true },
+      { label: "Phone Number:", text: "(609) 807-9228" },
+      { label: "Pick-up date:", text: "08/06/26" },
+      { label: "Drop off time:", text: "Before 2:30 PM" },
+      { label: "Special Instruction:", text: "Do not double stack the pallets." },
+    ]);
   });
 
   it("IN 15595 (99.pdf): Invoice, bill to and shipped to, mark R", () => {

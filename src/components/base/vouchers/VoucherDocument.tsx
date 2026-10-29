@@ -172,6 +172,23 @@ export function VoucherDocument({ doc, qrSrc, templateUrl = TEMPLATE.url, ready,
   const manifest = Rows({ m, edges: manifestEdges, top: MANIFEST.top, rows: doc.manifest, limit: MANIFEST.bottomLimit, rowMin: MANIFEST.rowMin, pitch: MANIFEST.linePitch, firstBaseline: MANIFEST.firstBaseline, padX: MANIFEST.padX, size: MANIFEST.textSize, line: MANIFEST.line, field: "manifest", bodyTop: MANIFEST.headerBottom });
   const pack = Rows({ m, edges: PACK.edges, top: PACK.top, rows: doc.pack, limit: PACK.bottomLimit, rowMin: PACK.rowMin, pitch: PACK.linePitch, firstBaseline: PACK.firstBaseline, padX: PACK.padX, size: PACK.textSize, line: PACK.line, field: "pack", bodyTop: PACK.top + 127 });
 
+  // voucher note: long lines wrap (the label stays on the first line); what does not fit ends with an ellipsis
+  const noteLines: Array<{ label?: string; text: string; bold?: boolean }> = [];
+  for (const n of doc.note) {
+    const weight = n.bold ? 700 : 500;
+    const labelW = n.label ? m(`${n.label} `, SEMI, 700, NOTE.size) : 0;
+    const parts = wrapText(m, n.text, NOTE.max - labelW, SEMI, weight, NOTE.size);
+    // a first line that is only a label and a long word keeps going; later lines use the full width
+    const rest = parts.length > 1 ? wrapText(m, parts.slice(1).join(" "), NOTE.max, SEMI, weight, NOTE.size) : [];
+    noteLines.push({ label: n.label, text: parts[0], bold: n.bold });
+    for (const l of rest) noteLines.push({ text: l, bold: n.bold });
+  }
+  const noteCapacity = Math.floor((NOTE.limit - NOTE.firstBaseline) / NOTE.pitch) + 1;
+  if (noteLines.length > noteCapacity) {
+    noteLines.length = noteCapacity;
+    noteLines[noteCapacity - 1] = { ...noteLines[noteCapacity - 1], text: `${noteLines[noteCapacity - 1].text} …` };
+  }
+
   // pill
   const pillText = doc.status?.text ?? "";
   const pillW = pillText ? m(pillText, SEMI, 500, L.pill.size) + L.pill.padX * 2 : 0;
@@ -259,19 +276,12 @@ export function VoucherDocument({ doc, qrSrc, templateUrl = TEMPLATE.url, ready,
         <Txt x={DELIVER.right} y={DELIVER.trackingBaseline} size={DELIVER.valueSize} family={COND} weight={400} anchor="end" max={DELIVER.valueMax} field="tracking">{doc.tracking}</Txt>
 
         {/* ------------------------------------------------------------ voucher note, terms */}
-        {doc.note.map((n, i) => {
-          const y = NOTE.firstBaseline + i * NOTE.pitch;
-          if (y > NOTE.limit) return null;
-          const labelW = n.label ? m(`${n.label} `, SEMI, 700, NOTE.size) : 0;
-          const textW = m(n.text, SEMI, n.bold ? 700 : 500, NOTE.size);
-          const sx = Math.min(1, NOTE.max / (labelW + textW || 1));
-          return (
-            <text key={i} data-field={`note-${i}`} transform={`translate(${NOTE.x} ${y}) scale(${sx} ${K})`} fontFamily={SEMI} fontSize={NOTE.size} fill={INK}>
-              {n.label && <tspan fontWeight={700}>{`${n.label} `}</tspan>}
-              <tspan fontWeight={n.bold ? 700 : 500}>{n.text}</tspan>
-            </text>
-          );
-        })}
+        {noteLines.map((n, i) => (
+          <text key={i} data-field={`note-${i}`} transform={`translate(${NOTE.x} ${NOTE.firstBaseline + i * NOTE.pitch}) scale(1 ${K})`} fontFamily={SEMI} fontSize={NOTE.size} fill={INK}>
+            {n.label && <tspan fontWeight={700}>{`${n.label} `}</tspan>}
+            <tspan fontWeight={n.bold ? 700 : 500}>{n.text}</tspan>
+          </text>
+        ))}
         {doc.terms.map((t, i) => {
           const y = TERMS.firstBaseline + i * TERMS.pitch;
           return y > TERMS.limit ? null : (

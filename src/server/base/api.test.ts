@@ -194,7 +194,7 @@ describe("table engine API (PostgreSQL)", { skip }, () => {
 
     it("autonumbers are unique under concurrent creates and continue after existing records", async () => {
       const existing = (await bundle("vouchers")).records.map((r) => r.i as number);
-      const created = await Promise.all(Array.from({ length: 8 }, () => call("POST", "tables/vouchers/records", { vsf: "VSF", manifest: "x" })));
+      const created = await Promise.all(Array.from({ length: 8 }, () => call("POST", "tables/vouchers/records", { vsf: "https://airtable.com/tblTEST/recTEST", manifest: "x" })));
       const nums = created.map((c) => c.json.i as number);
       assert.equal(new Set(nums).size, 8);
       assert.ok(Math.min(...nums) > Math.max(...existing));
@@ -202,7 +202,7 @@ describe("table engine API (PostgreSQL)", { skip }, () => {
     });
 
     it("rejects unknown and read-only fields on create", async () => {
-      const r = await call("POST", "tables/vouchers/records", { vsf: "VSF", i: 5, bogus: true });
+      const r = await call("POST", "tables/vouchers/records", { vsf: "https://airtable.com/tblTEST/recTEST", i: 5, bogus: true });
       assert.equal(r.status, 422);
     });
   });

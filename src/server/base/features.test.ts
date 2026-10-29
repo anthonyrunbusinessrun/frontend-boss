@@ -346,6 +346,51 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     assert.deepEqual((await applyBaseMigrations(db.pool)).backfills, [], "running it again changes nothing");
   });
 
+  it("Vouchers: VSF is a link and Scans an attachment; the seed carries the export's links, notes and manifests", async () => {
+    const b = await bundle("vouchers");
+    assert.equal(b.fields.find((f) => f.key === "vsf")!.type, "url");
+    assert.equal(b.fields.find((f) => f.key === "scans")!.type, "attachment");
+    const v = (i: number) => b.records.find((r) => r.i === i)!;
+    assert.equal(v(11574).vsf, "https://airtable.com/tblK7rY6QSShUYfF7/recnXQccF9jWDFyNX?blocks=bliWJCFmNjlbeUs8q");
+    assert.equal(String(v(11578).voucherNote).split("\n").length, 5);
+    assert.ok(String(v(11579).manifest).includes("Unnamed record") && !String(v(11579).manifest).includes("Unnamed manifest"));
+    // VSF must be a real link; Scans take files like any attachment field
+    assert.equal((await call("POST", "tables/vouchers/records", { docType: "BL", vsf: "VSF" })).status, 422);
+    const ok = await call("POST", "tables/vouchers/records", { docType: "BL", vsf: "https://airtable.com/tblX/recY", scans: [] });
+    assert.equal(ok.status, 201);
+    assert.deepEqual(ok.json.scans, []);
+  });
+
+  it("upgrades a database that already has the earlier voucher import: only seed values are replaced, edits are kept, nothing is lost", async () => {
+    const { applyBaseMigrations } = await import("./migrate");
+    const q = db.pool.query.bind(db.pool);
+    // the earlier state: VSF a select holding "VSF", Scans a number, notes cut to their first line, the old manifest wording
+    await q(`UPDATE boss_fields SET type = 'singleSelect', options = '{"choices":[{"id":"ch_vsf","name":"VSF","color":"blue"}]}'::jsonb WHERE table_slug = 'vouchers' AND key = 'vsf'`);
+    await q(`UPDATE boss_fields SET type = 'number', options = '{"format":"integer","min":0}'::jsonb WHERE table_slug = 'vouchers' AND key = 'scans'`);
+    const patch = (i: number, data: Record<string, unknown>) => q(`UPDATE boss_records SET data = data || $2::jsonb WHERE section_slug = 'vouchers' AND data->>'i' = $1`, [String(i), JSON.stringify(data)]);
+    await patch(11574, { vsf: "VSF", scans: 0 });
+    await patch(11578, { vsf: "VSF", voucherNote: "Total Quality Logistics (TQL)", scans: 3 });
+    await patch(11579, { vsf: "VSF", voucherNote: "Company: ABC Company", manifest: "QUOTE REQUESTED:\nUnnamed manifest\nUnnamed manifest", reference2: "Airline Booking #: " });
+    await patch(11580, { vsf: "https://my.example/own-link", voucherNote: "My own note, typed by a person" });
+    await q("DELETE FROM boss_migrations WHERE id = 'v6:vouchers-csv-update'");
+
+    const report = await applyBaseMigrations(db.pool);
+    assert.ok(report.backfills.some((x) => x.id === "v6:vouchers-csv-update"));
+    const b = await bundle("vouchers");
+    assert.equal(b.fields.find((f) => f.key === "vsf")!.type, "url");
+    assert.equal(b.fields.find((f) => f.key === "scans")!.type, "attachment");
+    const v = (i: number) => b.records.find((r) => r.i === i)!;
+    assert.equal(v(11574).vsf, "https://airtable.com/tblK7rY6QSShUYfF7/recnXQccF9jWDFyNX?blocks=bliWJCFmNjlbeUs8q", "the placeholder VSF became the link");
+    assert.equal(v(11578).voucherNote, "Total Quality Logistics (TQL)\nPhone Number: (513) 831-2600\nEst. Price of Delivery: $3,750.00\nPick-up time: 7:00 AM to 4:30 PM\nPick-up date: 07/28/26", "a note cut to its first line was completed");
+    assert.equal(v(11578).scansCount, 3, "an old Scans number is kept, under another key");
+    assert.ok(!("scans" in v(11578)) || Array.isArray(v(11578).scans), "Scans is free for files");
+    assert.equal(v(11579).manifest, "QUOTE REQUESTED:\nUnnamed record\nUnnamed record");
+    assert.equal(v(11579).reference2, "Airline Booking #:", "a trailing space was trimmed");
+    assert.equal(v(11580).voucherNote, "My own note, typed by a person", "a note a person wrote is never replaced");
+    assert.equal(v(11580).vsf, "https://my.example/own-link", "a link a person set is kept");
+    assert.deepEqual((await applyBaseMigrations(db.pool)).backfills, [], "running it again changes nothing");
+  });
+
   it("the migration reports no warnings on a fresh database and creates the code indexes", async () => {
     assert.deepEqual(db.report.warnings, []);
     const idx = await db.pool.query("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'boss_seq_%' ORDER BY 1");

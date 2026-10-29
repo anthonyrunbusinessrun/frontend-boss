@@ -709,7 +709,7 @@ with sync_playwright() as p:
         n0 = page.get_by_role("grid").get_by_role("row").count()
         page.get_by_role("button", name="New voucher").click()
         dlg = page.get_by_role("dialog")
-        dlg.get_by_label("Manifest", exact=True).fill(f"P/U - E2E {RUN}\nPallet of wipes"); dlg.get_by_label("VSF").select_option("VSF")
+        dlg.get_by_label("Manifest", exact=True).fill(f"P/U - E2E {RUN}\nPallet of wipes"); dlg.get_by_label("VSF").fill("https://airtable.com/tblE2E/rec" + RUN)
         assert dlg.get_by_label("ID", exact=True).count() == 0  # autonumber is not typed in
         dlg.get_by_role("button", name="Create voucher").click()
         expect(page.get_by_role("dialog").last).to_contain_text("12")

@@ -52,15 +52,15 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 ## 5. Vouchers (from the Infant & Toddler screenshot)
 
 - Columns follow the screenshot: **I** (autonumber, starts at 11574), **No** (= I + 1000), **VSF**, **Manifest**, **QR**.
-- *VSF* is modeled as a single select with one option (“VSF”) because the meaning is not visible. *Manifest* is long
-  text (one line per shipment line); the screenshot suggests it may link to a Manifest table that does not exist here.
+- **VSF** is a link field: the export holds each voucher's record link (an Airtable URL such as `https://airtable.com/tbl…/rec…`). It opens in a new tab and must be a real link. (Earlier it was a one-option dropdown.) *Manifest* is long text, one shipment line per line.
+- **Scans** is an attachment field, as in the export. The export's one scan (`2026-0709-01_DC_PA.pdf` on voucher 15574) and its QR image files are referenced only by temporary Airtable download links, which are not read or stored: upload the scan in the app, and use the QR generator for the QR column.
 - Extra fields hold the details printed on a voucher (accrual date, vendor account, operated by, deliver via, resource,
   tracking, note, terms, manifest rows), hidden in the “Simplified” view. The voucher number is `LLG-` + type + (I + 4000):
   I 11574 with type FD gives `LLG-FD-15574`, as on the supplied PDF. The earlier HTML “Bill of Lading” preview was replaced
   by the voucher document drawn on the supplied template (see section 10).
 - **QR codes** encode a link to the voucher in this app (`/vouchers?record=…`). The “Run” button generates a QR
   image for vouchers without one and stores it as an attachment.
-- The previous ledger fields (Voucher ID, SP, SVC, Debit, Credit, Balance, Scans, Prefix, Label, ID, Sum, Cover)
+- The previous ledger fields (Voucher ID, SP, SVC, Debit, Credit, Balance, Prefix, Label, Legacy ID, Sum, Cover)
   are kept, hidden, and visible in the “Ledger (previous layout)” view. No accounting rules are applied to them.
 - The screenshot's “Extensions” panel is a Voucher tools panel here; the “Edit code” part is not reproduced.
 
@@ -126,3 +126,10 @@ still has its own Work / Vouchers category in its builder and create dialog and 
 - Not built from the reference: “Describe how to filter this view” (an AI feature) and “Add condition group” (nested groups). Conditions are one list joined by and / or, evaluated left to right.
 - In server mode (very large tables) search covers stored text, number, date, select and contact values, not linked-record names; grouping, calendar placement and timelines use the loaded page only. A filter on a field derived from another table (“folios in this category”) is refused there.
 - Double-clicking a read-only cell (Code, Voucher No., PDF status…) opens the record.
+
+## 11. Vouchers from the full Airtable export (Vouchers-VOUCHERS - Simplified.csv)
+
+- The export has the same 20 columns and 16 vouchers as before. What it adds: the **full Notes** (several lines per voucher), the Manifest wording "Unnamed record" (was "Unnamed manifest"), and each voucher's **VSF** link. Reference 2 had a trailing space on some rows; it is trimmed.
+- The export's Manifest cell is a comma-joined list in which items containing a comma are quoted; the data is stored one line per row (`scripts/vouchers-csv-to-seed.py` does the conversion and can be run again on a newer export).
+- Existing databases: `npm run db:migrate` completes only what is still the old seed value (a note cut to its first line, "Unnamed manifest", the placeholder VSF). A note, link or manifest a person edited is kept. An old numeric Scans value is kept in the record as `scansCount`. A voucher that was deleted is not brought back.
+- The voucher document now prints the full Notes (bold labels) and wraps long note lines as the sample PDFs do.

@@ -96,3 +96,10 @@ API routes for records, fields and sections now match only their exact path. Pre
 - Pack Details help text: five columns (the template's pack table has no Destination column).
 - Fixed: the document's text-fit measurement is identical on server and first browser render (no hydration error).
 - The favorites browser test now reflects the signed-in-account model of the authentication update.
+
+# Update 5: Vouchers from the full Airtable export
+
+- Vouchers seed data regenerated from `Vouchers-VOUCHERS - Simplified.csv` (`scripts/vouchers-csv-to-seed.py`): full multi-line Notes, "Unnamed record" manifest wording, each voucher's VSF link, Reference 2 trimmed.
+- **VSF** is now a link field and **Scans** an attachment field (as in the export). Migration `v6` converts existing databases without overwriting edits (see NEEDS_CLARIFICATION section 11).
+- The voucher document wraps long note lines (as the sample PDFs do).
+- Not imported: the export's Scans/QR files (temporary Airtable download links).

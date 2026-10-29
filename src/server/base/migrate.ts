@@ -448,6 +448,73 @@ async function backfillsV5(client: PoolClient, report: MigrationReport) {
   );
 }
 
+/**
+ * Vouchers follow the full Airtable export (Vouchers-VOUCHERS - Simplified.csv):
+ *  - VSF becomes a link field (it holds the voucher's record link) and Scans an attachment field;
+ *  - Notes get their full text, Manifest the CSV's wording ("Unnamed record"), VSF its link.
+ * Careful with existing data: a cell is only replaced when it is blank or still holds the value the earlier seed wrote
+ * (the first line of the note, "Unnamed manifest", the placeholder "VSF"). Anything a person typed is kept. Nothing is deleted:
+ * an old numeric Scans value moves to `scansCount` inside the record.
+ */
+async function backfillsV6(client: PoolClient, report: MigrationReport) {
+  const has = (await client.query("SELECT 1 FROM boss_sections WHERE slug = 'vouchers'")).rowCount;
+  if (!has) return;
+  await once(
+    client,
+    "v6:vouchers-csv-update",
+    async () => {
+      // 1. field types
+      const vsf = await client.query<{ type: string }>("SELECT type FROM boss_fields WHERE table_slug = 'vouchers' AND key = 'vsf'");
+      let typed = 0;
+      if (vsf.rows[0]?.type === "singleSelect") {
+        await client.query(`UPDATE boss_fields SET type = 'url', options = $1::jsonb, updated_at = NOW() WHERE table_slug = 'vouchers' AND key = 'vsf'`, [JSON.stringify({ placeholder: "https://…", help: "Link to the voucher's record." })]);
+        typed += 1;
+      }
+      const scans = await client.query<{ type: string }>("SELECT type FROM boss_fields WHERE table_slug = 'vouchers' AND key = 'scans'");
+      if (scans.rows[0]?.type === "number") {
+        await client.query(`UPDATE boss_fields SET type = 'attachment', options = $1::jsonb, updated_at = NOW() WHERE table_slug = 'vouchers' AND key = 'scans'`, [JSON.stringify({ help: "Scanned documents for this voucher." })]);
+        typed += 1;
+      }
+      // an old numeric Scans value is kept under another key, then the cell is free for files
+      const moved = await client.query(
+        `UPDATE boss_records SET data = (data - 'scans') || jsonb_build_object('scansCount', data->'scans'), updated_at = NOW()
+         WHERE section_slug = 'vouchers' AND jsonb_typeof(data->'scans') = 'number'`,
+      );
+
+      // 2. cell values from the export
+      const blank = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "");
+      let notes = 0, links = 0, manifests = 0, refs = 0;
+      for (const row of FEMA_VOUCHERS) {
+        const found = await client.query<{ record_id: string; data: Record<string, unknown> }>("SELECT record_id, data FROM boss_records WHERE section_slug = 'vouchers' AND data->>'i' = $1 LIMIT 1", [String(row.i)]);
+        if (!found.rowCount) continue; // a voucher someone deleted is not brought back
+        const { record_id: id, data } = found.rows[0];
+        const patch: Record<string, unknown> = {};
+        const note = typeof data.voucherNote === "string" ? data.voucherNote.trim() : "";
+        if (row.voucherNote && (blank(note) || note === row.voucherNote.split("\n")[0].trim()) && data.voucherNote !== row.voucherNote) {
+          patch.voucherNote = row.voucherNote;
+          notes += 1;
+        }
+        if (row.vsf && (blank(data.vsf) || data.vsf === "VSF")) {
+          patch.vsf = row.vsf;
+          links += 1;
+        }
+        if (typeof data.manifest === "string" && /(^|\n)Unnamed manifest(\n|$)/.test(data.manifest)) {
+          patch.manifest = data.manifest.replace(/(^|\n)Unnamed manifest(?=\n|$)/g, "$1Unnamed record");
+          manifests += 1;
+        }
+        if (typeof data.reference2 === "string" && data.reference2 !== data.reference2.trim()) {
+          patch.reference2 = data.reference2.trim();
+          refs += 1;
+        }
+        if (Object.keys(patch).length) await client.query("UPDATE boss_records SET data = data || $2::jsonb, updated_at = NOW() WHERE section_slug = 'vouchers' AND record_id = $1", [id, JSON.stringify(patch)]);
+      }
+      return `${typed} field types changed; ${moved.rowCount} old Scans counts kept as scansCount; ${notes} notes completed, ${links} VSF links set, ${manifests} manifests re-worded, ${refs} references trimmed`;
+    },
+    report,
+  );
+}
+
+
 async function backfillsV3(client: PoolClient, report: MigrationReport) {
   // Voucher PDFs are no longer created, uploaded or replaced by the app: every voucher shows the supplied Voucher.pdf.
   // The three PDF fields from the previous release are removed from the field list. Values already stored in records
@@ -564,6 +631,7 @@ export async function applyBaseMigrations(pool: Pool, opts: { freshSeed?: boolea
     await backfillsV3(client, report);
     await backfillsV4(client, report);
     await backfillsV5(client, report);
+    await backfillsV6(client, report);
     await ensureSequenceIndexes(client, report);
     // Autonumber counters for every table (fields added by an operator later get one on first use).
     for (const seed of TABLES) {

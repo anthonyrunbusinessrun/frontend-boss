@@ -349,6 +349,35 @@ with sync_playwright() as p:
         fill = doc().locator("[data-field=status] rect").get_attribute("fill"); assert fill == "#c4ecff", fill
     check("Voucher document: wording, parties, carrier, notes, terms and pill follow each Form and row", doc_details_per_form)
 
+    def doc_full_notes_wrap():
+        click_row("LLG-BL-15578"); expect(doc()).to_have_attribute("data-number", "LLG-BL-15578")
+        n = [t.strip() for t in doc().locator("[data-field^='note-']").all_text_contents()]
+        assert n == ["Total Quality Logistics (TQL)", "Phone Number: (513) 831-2600", "Est. Price of Delivery: $3,750.00", "Pick-up time: 7:00 AM to 4:30 PM", "Pick-up date: 07/28/26"], n
+        assert doc().locator("[data-field=note-0] tspan").first.get_attribute("font-weight") == "700"
+        assert doc().locator("[data-field=note-1] tspan").first.get_attribute("font-weight") == "700", "the label is bold"
+        assert doc().locator("[data-field=note-1] tspan").nth(1).get_attribute("font-weight") == "500", "the value is regular"
+        click_row("LLG-BL-15589"); expect(doc()).to_have_attribute("data-number", "LLG-BL-15589"); page.wait_for_timeout(300)
+        n = [t.strip() for t in doc().locator("[data-field^='note-']").all_text_contents()]
+        assert n[0] == "SAIA LTL Freight" and n[4].startswith("Special Instruction:") and len(n) == 6, n
+        assert " ".join(n[4:]) == "Special Instruction: Do not double stack the pallets.", "the long line wraps instead of shrinking"
+        sizes = doc().locator("[data-field=note-4]").get_attribute("transform"); assert sizes.startswith("translate(") and "scale(1 " in sizes, "wrapped, not squeezed"
+    check("Voucher document: the full multi-line Notes, bold labels, long lines wrap", doc_full_notes_wrap)
+
+    def vsf_and_scans():
+        view("VOUCHERS | Simplified")
+        row = rows().filter(has_text="LLG-FD-15574").first
+        link = row.locator("a[href^='https://airtable.com/tblK7rY6QSShUYfF7/recnXQccF9jWDFyNX']")
+        assert link.count() == 1, "VSF is a link"
+        assert link.first.get_attribute("target") == "_blank" and "noopener" in (link.first.get_attribute("rel") or "")
+        row.get_by_role("button", name=re.compile("^Open record")).click(); d = page.get_by_role("dialog").last; d.get_by_role("button", name="Edit").click()
+        assert d.get_by_label("VSF").get_attribute("type") in ("url", "text")
+        d.get_by_label("VSF").fill("not a link"); d.get_by_role("button", name="Save changes").click()
+        expect(d.get_by_text(re.compile("valid (web )?(link|address|URL)|http", re.I)).first).to_be_visible()
+        d.get_by_label("VSF").fill("https://airtable.com/tblK7rY6QSShUYfF7/recnXQccF9jWDFyNX?blocks=bliWJCFmNjlbeUs8q")
+        assert d.locator("input[type=file]").count() >= 2, "Scans takes files (and QR takes images)"
+        d.get_by_role("button", name="Cancel").click()
+    check("Vouchers: VSF is a link (opens in a new tab, must be a real link); Scans accepts files", vsf_and_scans)
+
     def doc_follows_edits():
         rows().filter(has_text="LLG-BL-15580").first.get_by_role("button", name=re.compile("^Open record")).click()
         d = page.get_by_role("dialog").last; d.get_by_role("button", name="Edit").click()
