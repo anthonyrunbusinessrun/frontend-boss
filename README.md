@@ -80,7 +80,7 @@ not changed (changes apply for that visit only).
 
 ### Automatic codes
 
-Text fields can be marked `sequence` (see `definitions.ts`): Actions **Code** (`A-4702`), Leads **Lead ID** (`L-4097`) and
+Text fields can be marked `sequence` (see `definitions.ts`): Actions **Code** (`A-4771`), Leads **Lead ID** (`L-4097`) and
 Transactions **Trans** (`04105`). The server assigns the next code when a record is created: one more than the highest
 number in use (never the record count), remembered in `boss_counters` so a deleted record's code is not reused, inside
 the table's write lock so simultaneous creates get different numbers, and backed by a unique index

@@ -259,7 +259,7 @@ describe("table engine API (PostgreSQL)", { skip }, () => {
       }
       const by = (t: string) => made.find((v) => v.type === t)!;
       assert.equal(by("calendar").config.dateField, "accrue");
-      assert.equal(by("kanban").config.stackField, "type");
+      assert.equal(by("kanban").config.stackField, "status");
       assert.equal(by("timeline").config.startField, "accrue");
       assert.ok(by("form").config.form!.fields.length >= 9);
 
@@ -276,7 +276,7 @@ describe("table engine API (PostgreSQL)", { skip }, () => {
       const copy = await call("POST", `tables/actions/views/${by("kanban").id}/duplicate`);
       assert.equal(copy.status, 201);
       assert.equal(copy.json.name, "Test kanban copy");
-      assert.equal(copy.json.config.stackField, "type");
+      assert.equal(copy.json.config.stackField, "status");
 
       for (const v of [...made, copy.json]) assert.equal((await call("DELETE", `tables/actions/views/${v.id}`)).status, 204);
       const keys = (await bundle("actions")).views.map((v) => v.config.key);

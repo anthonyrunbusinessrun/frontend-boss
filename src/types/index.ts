@@ -48,18 +48,8 @@ export interface FolioRow {
   actions: string | null;
 }
 
-export interface ActionRow {
-  id: string;
-  code: string;
-  accrue: string;
-  title: string;
-  type: "Tasking" | "Training" | "Notice";
-  status: "Ongoing" | "Queue" | "Scheduled";
-  folio: string;
-  wk: string;
-  act: boolean;
-  qa: boolean;
-}
+/** An action record. Its fields are defined in lib/base/definitions.ts (they follow the Actions export). */
+export type ActionRow = { id: string } & Record<string, unknown>;
 
 export interface VoucherRow {
   id: string;

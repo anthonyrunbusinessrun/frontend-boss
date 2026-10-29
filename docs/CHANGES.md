@@ -103,3 +103,21 @@ API routes for records, fields and sections now match only their exact path. Pre
 - **VSF** is now a link field and **Scans** an attachment field (as in the export). Migration `v6` converts existing databases without overwriting edits (see NEEDS_CLARIFICATION section 11).
 - The voucher document wraps long note lines (as the sample PDFs do).
 - Not imported: the export's Scans/QR files (temporary Airtable download links).
+
+# Update 6: Actions from the Airtable export
+
+- Actions seed data regenerated from `Actions-OPEN ACTIONS - HOT QA NEXT.csv` (`scripts/actions-csv-to-seed.py`): 158 actions, 10 columns (Code, Wk, Accrue, Status, Task Title, Type, Folio, Asn, QA, Sort).
+- New fields **Asn** (multi-link to team profiles) and **Sort**; Status and Type gained the export's values; nothing but Code is required; "All Actions" keeps the export's order. The **Act** checkbox is no longer part of the table (kept, hidden, where it exists).
+- Migration `v7` upgrades existing databases without overwriting edits (see NEEDS_CLARIFICATION section 12).
+- Server-side filtering now treats a link field whose people are still text (legacy value) as not empty, like the browser does.
+- Tests and browser checks that used the demo actions now use the real data.
+
+## Results of the checks that were run (Update 6)
+| Command | Result |
+| --- | --- |
+| `npm run lint` | passes |
+| `npm test` | 174 / 174 pass |
+| `npm run build` | passes |
+| `python3 qa/base-e2e.py` (browser, fresh database, behind the local test sign-in) | 66 / 66 |
+| `python3 qa/e2e-update2.py` (browser, fresh database, with a second server-filter instance) | 35 / 35 |
+| `npm run test:auth` | passes |

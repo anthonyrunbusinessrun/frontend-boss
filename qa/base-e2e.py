@@ -109,6 +109,12 @@ def close_panels():
     for _ in range(3):
         if page.locator("[role=dialog][data-floating-level]").count(): page.keyboard.press("Escape"); page.wait_for_timeout(150)
 
+def count_records(table):
+    return page.evaluate("async t => (await (await fetch('/api/base/tables/' + t)).json()).records.length", table)
+
+def record_field(table, code, key):
+    return page.evaluate("async ([t, c, k]) => (await (await fetch('/api/base/tables/' + t)).json()).records.find(r => r.code === c)[k]", [table, code, key])
+
 def open_grid(name="All Actions"):
     sidebar().get_by_role("button", name=name, exact=True).click()
     page.wait_for_timeout(400)
@@ -153,7 +159,7 @@ with sync_playwright() as p:
     def removed_routes():
         for path in ["/boss", "/packet", "/accounts", "/registries"]:
             page.goto(BASE + path, wait_until="load")
-            assert page.get_by_text("This page could not be found").count() == 1, path
+            expect(page.get_by_text("This page could not be found"), path).to_have_count(1)
     check("removed tabs' routes no longer render a screen", removed_routes)
 
     # ------------------------------------------------------------- create menu / views
@@ -200,7 +206,7 @@ with sync_playwright() as p:
             if k == "Calendar": assert page.get_by_role("grid", name="October 2026").count() + page.locator('[role=grid][aria-label]').count() >= 1; assert page.get_by_text("Sun").count() >= 1
             if k == "Kanban": expect(page.locator("section[aria-label^=Queue]")).to_have_count(1)
             if k == "Gallery": assert page.locator("button", has_text="A-4642").count() >= 1 or page.get_by_text("Add record").count() >= 1
-            if k == "List": assert page.get_by_text("Review S14 Telemetry Reports").count() >= 1
+            if k == "List": assert page.get_by_role("button", name="Expand A-4695").count() == 1
             if k == "Timeline": assert page.get_by_role("button", name="Day").count() == 1
             if k == "Gantt": assert page.get_by_text("Task", exact=True).count() >= 1
             if k == "Form": assert page.get_by_role("button", name="Submit").count() == 1
@@ -218,32 +224,32 @@ with sync_playwright() as p:
     def switch_keeps_records():
         sidebar().get_by_role("button", name="All Actions", exact=True).click()
         expect(page.locator("h1")).to_contain_text("All Actions")
-        expect(page.locator("p", has_text="16 actions").first).to_be_visible()
+        expect(page.locator("p", has_text=f"{count_records('actions')} actions").first).to_be_visible()
         sidebar().get_by_role("button", name=names["Kanban"], exact=True).click()
         expect(page.locator("h1")).to_contain_text(names["Kanban"])
-        expect(page.locator("p", has_text="16 actions").first).to_be_visible()
-    check("switching views keeps the same 16 records", switch_keeps_records)
+        expect(page.locator("p", has_text=f"{count_records('actions')} actions").first).to_be_visible()
+    check("switching views keeps the same records", switch_keeps_records)
 
     # -------------------------------------------------------------- kanban drag + persist
     def kanban_drag():
         sidebar().get_by_role("button", name=names["Kanban"], exact=True).click()
-        card = page.locator("section[aria-label^=Queue] [role=button]", has_text="Update Onboarding Guidelines").first
+        card = page.locator("section[aria-label^=Queue] [role=button]", has_text="Tiny House Manufacturing").first
         card.drag_to(page.locator("section[aria-label^=Ongoing]"))
         page.wait_for_timeout(800)
-        expect(page.locator("section[aria-label^=Ongoing]").get_by_text("Update Onboarding Guidelines")).to_be_visible()
+        expect(page.locator("section[aria-label^=Ongoing]").get_by_text("Tiny House Manufacturing")).to_be_visible()
         page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
         sidebar().get_by_role("button", name=names["Kanban"], exact=True).click()
-        expect(page.locator("section[aria-label^=Ongoing]").get_by_text("Update Onboarding Guidelines")).to_be_visible()
+        expect(page.locator("section[aria-label^=Ongoing]").get_by_text("Tiny House Manufacturing")).to_be_visible()
         sidebar().get_by_role("button", name="All Actions", exact=True).click()
-        expect(page.get_by_role("row").filter(has_text="Update Onboarding Guidelines")).to_contain_text("Ongoing")
+        expect(page.get_by_role("row").filter(has_text="Tiny House Manufacturing")).to_contain_text("Ongoing")
     check("kanban: dragging a card changes its status; saved, and shown in the grid", kanban_drag)
 
     def kanban_keyboard():
         sidebar().get_by_role("button", name=names["Kanban"], exact=True).click()
-        card = page.locator("section[aria-label^=Ongoing] [role=button]", has_text="Update Onboarding Guidelines").first
+        card = page.locator("section[aria-label^=Ongoing] [role=button]", has_text="Tiny House Manufacturing").first
         card.focus(); page.keyboard.press("ArrowRight")
         page.wait_for_timeout(700)
-        expect(page.locator("section[aria-label^=Queue]").get_by_text("Update Onboarding Guidelines")).to_be_visible()
+        expect(page.locator("section[aria-label^=Queue]").get_by_text("Tiny House Manufacturing")).to_be_visible()
     check("kanban: keyboard arrows move a card between columns", kanban_keyboard)
 
     # --------------------------------------------------------------- calendar interactions
@@ -253,11 +259,11 @@ with sync_playwright() as p:
         # data is July 2026: navigate back from October 2026
         for _ in range(3): page.get_by_role("button", name="Previous month").click()
         expect(page.get_by_role("heading", name="July 2026")).to_be_visible()
-        chip = page.locator("button[draggable=true]", has_text="A-4701").first
+        chip = page.locator("button[draggable=true]", has_text="A-4542").first
         assert chip.is_visible()
         day = page.locator('[role=gridcell][aria-label="2026-07-20"]')
         chip.drag_to(day); page.wait_for_timeout(800)
-        expect(day.get_by_text("A-4701")).to_be_visible()
+        expect(day.get_by_text("A-4542")).to_be_visible()
         page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
     check("calendar: shows records by date and a dragged record moves to the new day", calendar_move)
 
@@ -292,11 +298,11 @@ with sync_playwright() as p:
         page.locator("[role=dialog]").last.get_by_label("Dependency field").select_option(label="Depends on")
         page.keyboard.press("Escape")
         # link two tasks through the record drawer
-        page.locator("[role=button]", has_text="A-4701").first.click()
+        page.locator("[role=button]", has_text="A-4546").first.click()
         drawer = page.get_by_role("dialog").last
         drawer.get_by_role("button", name="Edit").click()
         drawer.get_by_label("Depends on").click()
-        page.get_by_role("option", name="A-4642").click()
+        page.get_by_role("option", name="A-4542").click()
         page.keyboard.press("Escape")
         drawer.get_by_role("button", name="Save changes").click()
         page.wait_for_timeout(800)
@@ -441,37 +447,40 @@ with sync_playwright() as p:
     # --------------------------------------------------------- grid: edit, resize, sort, filter, fields
     def grid_edit():
         go("/actions"); open_grid()
+        orig = record_field("actions", "A-4642", "title"); edited = orig + " (edited)"
         row = page.get_by_role("row").filter(has_text="A-4642")
-        cell = row.get_by_role("gridcell").nth(4)  # Title (after checkbox, row number, code, accrue)
+        cell = row.get_by_role("gridcell").nth(6)  # Task Title (after checkbox, row number, code, wk, accrue, status)
         cell.dblclick()
         inp = row.locator("input[type=text]").first
-        inp.fill("Review S14 Telemetry Reports (edited)"); inp.press("Enter")
-        expect(page.get_by_text("Review S14 Telemetry Reports (edited)")).to_be_visible()
+        inp.fill(edited); inp.press("Enter")
+        expect(page.get_by_text(edited)).to_be_visible()
         page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
-        expect(page.get_by_text("Review S14 Telemetry Reports (edited)")).to_be_visible()
+        expect(page.get_by_text(edited)).to_be_visible()
+        assert record_field("actions", "A-4642", "title") == edited, "saved in the database"
         row = page.get_by_role("row").filter(has_text="A-4642")
-        row.get_by_role("gridcell").nth(4).dblclick()
-        i2 = row.locator("input[type=text]").first; i2.fill("Review S14 Telemetry Reports"); i2.press("Enter")
+        row.get_by_role("gridcell").nth(6).dblclick()
+        i2 = row.locator("input[type=text]").first; i2.fill(orig); i2.press("Enter")
     check("grid: edit a cell in place; value is saved to the database", grid_edit)
 
     def grid_checkbox_select():
         open_grid()
         row = page.get_by_role("row").filter(has_text="A-4642")
-        c = row.get_by_role("gridcell").nth(9)  # Act checkbox
+        c = row.get_by_role("gridcell").nth(10)  # QA checkbox
         before = c.locator("svg").count()
         c.click(); page.wait_for_timeout(700)
-        assert page.get_by_role("row").filter(has_text="A-4642").get_by_role("gridcell").nth(9).locator("svg").count() != before
-        page.get_by_role("row").filter(has_text="A-4642").get_by_role("gridcell").nth(9).click(); page.wait_for_timeout(500)
+        assert page.get_by_role("row").filter(has_text="A-4642").get_by_role("gridcell").nth(10).locator("svg").count() != before
+        page.get_by_role("row").filter(has_text="A-4642").get_by_role("gridcell").nth(10).click(); page.wait_for_timeout(500)
     check("grid: clicking a checkbox cell toggles and saves it", grid_checkbox_select)
 
     def grid_sort_filter_group():
         open_grid()
-        page.get_by_role("columnheader", name="Title").get_by_role("button").first.click()
-        page.get_by_role("menuitem", name="Sort Z → A").click()
+        unsorted_first = page.get_by_role("row").nth(1).inner_text()
+        page.get_by_role("columnheader", name="Task Title").get_by_role("button").first.click()
+        page.get_by_role("menuitem", name="Sort Z → A").click(); page.wait_for_timeout(400)
         first = page.get_by_role("row").nth(1).inner_text()
-        assert "Validate Sourcing Schema" in first or "Update Onboarding" in first or "Review" not in first, first
+        assert first != unsorted_first, first
         page.get_by_role("button", name="Sorted by 1 field").click()
-        page.get_by_role("button", name="Remove Title").click(); page.keyboard.press("Escape")
+        page.get_by_role("button", name="Remove Task Title").click(); page.keyboard.press("Escape")
         add_condition("Status", value=("pick", "Queue"))
         page.keyboard.press("Escape")
         expect(page.locator("p", has_text=re.compile(r"\d+ of \d+ actions")).first).to_be_visible()
@@ -498,14 +507,14 @@ with sync_playwright() as p:
     def resize_columns():
         go("/actions")
         sidebar().get_by_role("button", name="All Actions", exact=True).click()
-        sep = page.get_by_role("separator", name="Resize Title")
-        box = sep.bounding_box(); w0 = page.get_by_role("columnheader", name="Title").bounding_box()["width"]
+        sep = page.get_by_role("separator", name="Resize Task Title")
+        box = sep.bounding_box(); w0 = page.get_by_role("columnheader", name="Task Title").bounding_box()["width"]
         page.mouse.move(box["x"] + 3, box["y"] + 10); page.mouse.down(); page.mouse.move(box["x"] + 123, box["y"] + 10, steps=6); page.mouse.up()
         page.wait_for_timeout(900)
-        w1 = page.get_by_role("columnheader", name="Title").bounding_box()["width"]
+        w1 = page.get_by_role("columnheader", name="Task Title").bounding_box()["width"]
         assert w1 > w0 + 80, (w0, w1)
         page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
-        w2 = page.get_by_role("columnheader", name="Title").bounding_box()["width"]
+        w2 = page.get_by_role("columnheader", name="Task Title").bounding_box()["width"]
         assert abs(w2 - w1) < 3, (w1, w2)
     check("grid: resize a column; width persists after refresh", resize_columns)
 
@@ -531,8 +540,10 @@ with sync_playwright() as p:
         go("/actions"); open_grid()
         page.get_by_role("button", name="New action").click()
         dlg = page.get_by_role("dialog")
+        dlg.get_by_label("Sort").fill("-1")
         dlg.get_by_role("button", name="Create action").click()
         expect(dlg.get_by_role("alert").first).to_be_visible()  # validation, nothing saved
+        dlg.get_by_label("Sort").fill("")
         dlg.get_by_label("Title").fill(f"E2E record {RUN}")
         dlg.get_by_label("Accrue").fill("2026-11-02"); dlg.get_by_label("Type").select_option("Tasking"); dlg.get_by_label("Status").select_option("Queue")
         dlg.get_by_role("button", name="Create action").click()
@@ -714,7 +725,7 @@ with sync_playwright() as p:
         dlg.get_by_role("button", name="Create voucher").click()
         expect(page.get_by_role("dialog").last).to_contain_text("12")
         page.keyboard.press("Escape")
-        assert page.get_by_role("grid").get_by_role("row").count() == n0 + 1
+        expect(page.get_by_role("grid").get_by_role("row")).to_have_count(n0 + 1)
     check("Vouchers: create a voucher; ID is assigned automatically and No = ID + 1000", voucher_create_autonumber)
 
     def voucher_deeplink():

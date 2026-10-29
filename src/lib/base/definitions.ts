@@ -41,6 +41,14 @@ const rule = (id: string, field: string, op: ViewConfig["filters"][number]["op"]
 
 export const VOUCHER_START = 11574;
 
+/** Values used in the Actions export. The first three of each were the original choices and keep their place. */
+export const ACTION_STATUSES = ["Ongoing", "Queue", "Scheduled", "Priority", "Review", "NOW", "Snoozed", "Problem", "Waiting For", "Archive"];
+export const ACTION_STATUS_COLORS: ChoiceColor[] = ["red", "purple", "cyan", "orange", "blue", "green", "gray", "pink", "yellow", "gray"];
+export const ACTION_TYPES = ["Tasking", "Training", "Notice", "Research", "Planning", "Phone", "Movement", "Outcome", "Sourcing", "Legal", "Updates", "Decision", "Cancel", "Maintenance", "Conf Call", "Mech", "Banking", "Meeting"];
+export const ACTION_TYPE_COLORS: ChoiceColor[] = ["blue", "orange", "yellow", "purple", "cyan", "green", "pink", "green", "cyan", "red", "blue", "orange", "gray", "yellow", "purple", "gray", "green", "pink"];
+/** Fields of the earlier Actions table that are not in the export. A database that has them keeps the values, hidden. */
+export const ACTION_PREVIOUS_KEYS = ["act"];
+
 /** FEMA_Vouchers.xlsx column order (Voucher … Notes). */
 export const VOUCHER_FEMA_ORDER = [
   "voucherNo",
@@ -157,18 +165,21 @@ export const TABLES: TableSeed[] = [
     name: "Actions",
     singular: "action",
     fields: [
+      // Columns of the Actions export, in its order (Code, Wk, Accrue, Status, Task Title, Type, Folio, Asn, QA, Sort).
       { key: "code", name: "Code", type: "text", required: true, primary: true, options: { unique: true, sequence: { prefix: "A-" }, help: "Assigned automatically: the next number after the highest existing code." } },
-      { key: "accrue", name: "Accrue", type: "date", required: true },
-      { key: "title", name: "Title", type: "text", required: true },
-      { key: "type", name: "Type", type: "singleSelect", required: true, options: sel(["Tasking", "Training", "Notice"], ["blue", "orange", "yellow"]) },
-      { key: "status", name: "Status", type: "singleSelect", required: true, options: sel(["Ongoing", "Queue", "Scheduled"], ["red", "purple", "cyan"]) },
+      { key: "wk", name: "Wk", type: "text", options: { placeholder: "e.g. 26.28", help: "Week of the action, or “Action” when it has no date." } },
+      { key: "accrue", name: "Accrue", type: "date" },
+      { key: "status", name: "Status", type: "singleSelect", options: sel(ACTION_STATUSES, ACTION_STATUS_COLORS) },
+      { key: "title", name: "Task Title", type: "text" },
+      { key: "type", name: "Type", type: "singleSelect", options: sel(ACTION_TYPES, ACTION_TYPE_COLORS) },
       { key: "folio", name: "Folio", type: "text" },
-      { key: "wk", name: "Wk", type: "text" },
-      { key: "act", name: "Act", type: "checkbox" },
+      { key: "asn", name: "Asn", type: "link", options: { linkTable: "profiles", multiple: true, legacyKey: "asnCode", linkFilter: { key: "team", equals: true }, help: "Team members the action is assigned to." } },
       { key: "qa", name: "QA", type: "checkbox" },
+      { key: "sort", name: "Sort", type: "number", options: { format: "integer", min: 0 } },
     ],
     views: [
-      { key: "all", name: "All Actions", type: "grid", config: { sort: [{ field: "accrue", dir: "asc" }] } },
+      // The export lists the actions in this order (grouped by assignee), so the main view keeps the table's own order.
+      { key: "all", name: "All Actions", type: "grid", config: { widths: { code: 100, wk: 90, accrue: 110, status: 110, title: 360, type: 110, folio: 240, asn: 140, qa: 60, sort: 70 } } },
       { key: "calendar", name: "Action Calendar", type: "calendar", config: { dateField: "accrue", titleField: "title" } },
       { key: "board", name: "Action Board", type: "kanban", config: { stackField: "status", titleField: "title" } },
     ],

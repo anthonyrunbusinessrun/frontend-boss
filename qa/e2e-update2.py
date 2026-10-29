@@ -175,12 +175,12 @@ with sync_playwright() as p:
     def code_increments():
         c1 = next_code(); d = page.get_by_role("dialog")
         assert d.get_by_test_id("code-code").get_attribute("readonly") is not None
-        assert c1 == "A-4702", c1
+        assert c1 == "A-4771", c1
         fill_action(f"U2 code one {RUN}"); d.get_by_role("button", name="Create action").click()
         expect(page.get_by_role("dialog").last.get_by_role("button", name="Edit")).to_be_visible()
         assert page.get_by_role("dialog").last.get_by_text(c1, exact=True).count() >= 1, "the generated code is visible when viewing"
         page.keyboard.press("Escape"); page.wait_for_timeout(400)
-        c2 = next_code(); assert c2 == "A-4703", c2
+        c2 = next_code(); assert c2 == "A-4772", c2
         fill_action(f"U2 code two {RUN}"); page.get_by_role("dialog").get_by_role("button", name="Create action").click()
         expect(page.get_by_role("dialog").last.get_by_role("button", name="Edit")).to_be_visible()
         codes.update(one=c1, two=c2)
@@ -410,6 +410,9 @@ with sync_playwright() as p:
     # ====================================================================== 5. Filtering
     go("/actions"); view("All Actions")
     def count_of(txt): return int(re.match(r"(\d+)", txt).group(1))
+    def subtitle(): return page.locator("p").filter(has_text=re.compile(r"^\d+( of \d+)? actions")).first.inner_text()
+    def shown(): return count_of(subtitle())
+    def acts(): return api("GET", "tables/actions")["records"]
     def filter_single():
         clear_filters(); total = api("GET", "tables/actions")["records"]; q = len([r for r in total if r["status"] == "Queue"])
         add_condition("Status", value=("pick", "Queue")); close_panels()
@@ -420,26 +423,30 @@ with sync_playwright() as p:
     check("Filter: a single-select filter shows only matching records, with an active indicator", filter_single)
 
     def filter_combined_and_remove():
-        add_condition("Accrue", op="is within", between=("2026-07-08", "2026-07-12")); close_panels()
-        expect(pills()).to_contain_text("Accrue is within 2026-07-08 and 2026-07-12")
-        n = len(rows().filter(has_text="Queue").all()); assert n >= 1 and rows().filter(has_text="Jul 6, 2026").count() == 0 and rows().filter(has_text="Jul 16, 2026").count() == 0
+        recs = acts(); lo, hi = "2026-07-08", "2026-07-12"
+        in_range = [r for r in recs if r.get("accrue") and lo <= r["accrue"] <= hi]; q_range = [r for r in in_range if r.get("status") == "Queue"]
+        assert len(in_range) > len(q_range) > 0, "the data has both Queue and other statuses in the range"
+        add_condition("Accrue", op="is within", between=(lo, hi)); close_panels()
+        expect(pills()).to_contain_text(f"Accrue is within {lo} and {hi}"); page.wait_for_timeout(300)
+        assert shown() == len(q_range), (shown(), len(q_range))
         pills().get_by_role("button", name=re.compile("^Remove filter: Status")).click(); page.wait_for_timeout(300)
         assert "Status is Queue" not in pills().inner_text() and "Accrue is within" in pills().inner_text()
-        assert rows().filter(has_text="Ongoing").count() >= 1, "removing one condition keeps the other"
+        assert shown() == len(in_range), "removing one condition keeps the other"
     check("Filter: several filters at once; remove one without losing the others", filter_combined_and_remove)
 
     def filter_any_of_and_clear():
-        clear_filters()
-        add_condition("Type", op="is any of", values=["Tasking", "Training"]); close_panels()
-        expect(pills()).to_contain_text("Type is any of Tasking, Training"); assert rows().filter(has_text="Notice").count() == 0
-        add_condition("Type", op="is none of", values=["Tasking"]); close_panels()  # now: any of (Tasking,Training) AND none of (Tasking) -> Training only
-        assert rows().filter(has_text="Tasking").count() == 0 and rows().filter(has_text="Training").count() >= 1
+        clear_filters(); recs = acts(); total = len(recs)
+        both = len([r for r in recs if r.get("type") in ("Tasking", "Research")]); research = len([r for r in recs if r.get("type") == "Research"])
+        add_condition("Type", op="is any of", values=["Tasking", "Research"]); close_panels(); page.wait_for_timeout(300)
+        expect(pills()).to_contain_text("Type is any of Tasking, Research"); assert shown() == both, (shown(), both)
+        add_condition("Type", op="is none of", values=["Tasking"]); close_panels(); page.wait_for_timeout(300)  # any of (Tasking, Research) AND none of (Tasking) -> Research only
+        assert shown() == research, (shown(), research)
         page.get_by_role("button", name="Clear all filters").first.click(); page.wait_for_timeout(300)
-        assert pills().count() == 0 and rows().filter(has_text="Notice").count() >= 1 and page.get_by_role("button", name="Filter", exact=True).count() == 1
+        assert pills().count() == 0 and shown() == total and page.get_by_role("button", name="Filter", exact=True).count() == 1
     check("Filter: include / exclude several values, then clear all", filter_any_of_and_clear)
 
     def filter_empty_state():
-        add_condition("Title", op="contains", value=("text", "zzzz-no-such-title")); close_panels()
+        add_condition("Task Title", op="contains", value=("text", "zzzz-no-such-title")); close_panels()
         expect(page.get_by_text("No actions match")).to_be_visible(); assert page.get_by_text("Your records are untouched").count() == 1
         assert page.get_by_text(re.compile(r"^0 of \d+ actions")).count() >= 1
         page.get_by_role("button", name="Clear all filters").first.click(); page.wait_for_timeout(300)
@@ -449,14 +456,15 @@ with sync_playwright() as p:
     def filter_with_search_sort_group():
         clear_filters()
         add_condition("Status", op="is not", value=("pick", "Scheduled")); close_panels()
-        page.get_by_placeholder("Search profiles, transactions, and categories…").fill("deploy"); page.wait_for_timeout(500)
-        txt = [t for t in rows().all_inner_texts() if re.search(r"A-\d{4}", t)]; assert txt and all("deploy" in t.lower() for t in txt) and all("Scheduled" not in t for t in txt), txt
-        page.get_by_role("button", name="Sorted by 1 field").click(); page.locator("[role=dialog]").last.get_by_role("button", name="Remove Accrue").click(); close_panels()
-        page.get_by_role("button", name="Sort", exact=True).click(); page.locator("[role=dialog]").last.get_by_role("button", name=re.compile("^Pick a field")).click()
+        page.get_by_placeholder("Search profiles, transactions, and categories…").fill("monday"); page.wait_for_timeout(600)
+        txt = [t for t in rows().all_inner_texts() if re.search(r"A-\d{4}", t)]
+        assert txt and all("monday" in t.lower() for t in txt), txt
+        expect_n = len([r for r in acts() if "monday" in (r.get("title") or "").lower() and r.get("status") != "Scheduled"]); assert len(txt) == expect_n, (len(txt), expect_n)
+        page.get_by_role("button", name="Sort", exact=True).first.click(); page.locator("[role=dialog]").last.get_by_role("button", name=re.compile("^Pick a field")).click()
         close_panels()
         page.get_by_role("button", name="Group", exact=True).click(); page.locator("[role=dialog]").last.get_by_role("button", name=re.compile("^Pick a field")).click(); close_panels()
-        assert page.get_by_role("button", name="Grouped by 1 field").count() == 1
-        assert rows().filter(has_text=re.compile("Deploy")).count() >= 1
+        assert page.get_by_role("button", name="Grouped by 1 field").count() == 1 and page.get_by_role("button", name="Sorted by 1 field").count() == 1
+        assert rows().filter(has_text=re.compile("Monday")).count() >= 1
         page.get_by_placeholder("Search profiles, transactions, and categories…").fill("")
         page.get_by_role("button", name="Grouped by 1 field").click(); page.locator("[role=dialog]").last.get_by_role("button", name=re.compile("^Remove")).click(); close_panels()
         page.get_by_role("button", name="Sorted by 1 field").click(); page.locator("[role=dialog]").last.get_by_role("button", name=re.compile("^Remove")).click(); close_panels()
@@ -528,7 +536,7 @@ with sync_playwright() as p:
         open_filter(); fp = filter_panel(); fp.get_by_role("button", name="Copy from another view").click()
         page.get_by_role("menuitem", name=re.compile("^All Actions")).click(); page.wait_for_timeout(300)
         expect(fp.get_by_role("button", name=re.compile(r"^Field: Status"))).to_be_visible()
-        add_condition("Title", op="contains", value=("text", "a")); fp = filter_panel()
+        add_condition("Task Title", op="contains", value=("text", "a")); fp = filter_panel()
         handles = fp.get_by_role("button", name=re.compile("^Reorder condition")); assert handles.count() == 2
         handles.nth(1).focus(); page.keyboard.press("ArrowUp"); page.wait_for_timeout(300)
         assert fp.get_by_role("button", name=re.compile(r"^Field:")).first.get_attribute("aria-label").endswith("Title")
@@ -537,7 +545,7 @@ with sync_playwright() as p:
     check("Filter: copy conditions from another view; reorder conditions", filter_copy_and_reorder)
 
     def filter_changes_nothing():
-        before = len(api("GET", "tables/actions")["records"]); add_condition("Title", op="contains", value=("text", "zzz")); close_panels(); clear_filters()
+        before = len(api("GET", "tables/actions")["records"]); add_condition("Task Title", op="contains", value=("text", "zzz")); close_panels(); clear_filters()
         assert len(api("GET", "tables/actions")["records"]) == before
     check("Filter: filtering never changes or deletes records", filter_changes_nothing)
 
@@ -555,10 +563,10 @@ with sync_playwright() as p:
             qn = api("POST", "tables/actions/query", {"filters": [{"id": "x", "join": "and", "field": "status", "op": "is", "value": "Queue"}], "limit": 500, "offset": 0})["total"]
             expect(page.get_by_text(re.compile(rf"Showing \d+ of {qn} matching"))).to_be_visible()
             assert rows().filter(has_text="Ongoing").count() == 0
-            page.get_by_placeholder("Search profiles, transactions, and categories…").fill("deploy"); page.wait_for_timeout(900)
-            assert all("deploy" in t.lower() for t in rows().all_inner_texts() if re.search(r"A-\d{4}", t))
+            page.get_by_placeholder("Search profiles, transactions, and categories…").fill("monday"); page.wait_for_timeout(900)
+            assert all("monday" in t.lower() for t in rows().all_inner_texts() if re.search(r"A-\d{4}", t))
             page.get_by_placeholder("Search profiles, transactions, and categories…").fill("")
-            add_condition("Title", op="contains", value=("text", "qqqqq")); close_panels(); page.wait_for_timeout(900)
+            add_condition("Task Title", op="contains", value=("text", "qqqqq")); close_panels(); page.wait_for_timeout(900)
             expect(page.get_by_text("No actions match")).to_be_visible()
             clear_filters()
         check("Large tables: the server filters, searches and pages (Load more); empty state works", server_mode)

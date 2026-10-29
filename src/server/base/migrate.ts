@@ -1,7 +1,9 @@
 import type { Pool, PoolClient } from "pg";
 import { FEMA_VOUCHERS } from "@/data/femaVouchers";
+import { assignees } from "@/data/actions";
+import { ACTION_EXPORT } from "@/data/actionsExport";
 import { defaultFormConfig } from "@/lib/base/viewDefaults";
-import { TABLES, VOUCHER_DOCUMENT_KEYS, VOUCHER_FEMA_ORDER, VOUCHER_LEGACY_KEYS, VOUCHER_START, seedViewConfig, type TableSeed } from "@/lib/base/definitions";
+import { ACTION_PREVIOUS_KEYS, TABLES, VOUCHER_DOCUMENT_KEYS, VOUCHER_FEMA_ORDER, VOUCHER_LEGACY_KEYS, VOUCHER_START, seedViewConfig, type TableSeed } from "@/lib/base/definitions";
 import type { FieldDef } from "@/lib/base/types";
 import { choicesFromNames } from "@/lib/base/fields";
 
@@ -448,6 +450,151 @@ async function backfillsV5(client: PoolClient, report: MigrationReport) {
   );
 }
 
+/** The 16 demo actions the project shipped with before the real Actions export. Used only to recognise untouched ones. */
+const LEGACY_DEMO_ACTIONS: Array<[string, string, string, string, string, string, string, boolean, boolean]> = [
+  ["A-4642", "2026-07-06", "Review S14 Telemetry Reports", "Tasking", "Ongoing", "FL-1002", "26.28", true, true],
+  ["A-4643", "2026-07-06", "Update Onboarding Guidelines", "Training", "Queue", "FL-1004", "26.28", false, false],
+  ["A-4645", "2026-07-07", "Draft QA Deployment Notice", "Notice", "Scheduled", "FL-1005", "26.29", true, false],
+  ["A-4650", "2026-07-07", "API Compliance Test Run", "Tasking", "Ongoing", "FL-1012", "26.29", true, true],
+  ["A-4652", "2026-07-08", "Database Indexing Protocols", "Tasking", "Queue", "FL-1001", "26.30", false, false],
+  ["A-4658", "2026-07-09", "Deploy Security Patch v2.1", "Notice", "Ongoing", "FL-1002", "26.30", true, true],
+  ["A-4663", "2026-07-10", "Prepare Sprint Review Deck", "Training", "Scheduled", "FL-1004", "26.31", true, false],
+  ["A-4665", "2026-07-10", "Validate Sourcing Schema", "Tasking", "Queue", "FL-1008", "26.31", false, false],
+  ["A-4672", "2026-07-11", "Sync with Vendor Core API", "Tasking", "Ongoing", "FL-1020", "26.32", true, true],
+  ["A-4675", "2026-07-12", "Internal Training: Rust Core", "Training", "Scheduled", "FL-1011", "26.32", false, false],
+  ["A-4681", "2026-07-13", "Refactor Legacy Auth Modules", "Tasking", "Queue", "FL-1005", "26.33", false, false],
+  ["A-4688", "2026-07-14", "Audit Log Processing Flow", "Notice", "Ongoing", "FL-1001", "26.33", true, true],
+  ["A-4690", "2026-07-15", "Optimize Image Generation Assets", "Tasking", "Scheduled", "FL-1014", "26.34", true, false],
+  ["A-4693", "2026-07-16", "Deploy Hotfix - User Sessions", "Notice", "Ongoing", "FL-1002", "26.34", true, true],
+  ["A-4698", "2026-07-17", "Review SML Custom Templates", "Training", "Queue", "FL-1004", "26.35", false, false],
+  ["A-4701", "2026-07-18", "Setup Telemetry Edge Cache", "Tasking", "Scheduled", "FL-1012", "26.35", true, false],
+];
+
+/**
+ * Actions follow the Airtable export (Actions-OPEN ACTIONS - HOT QA NEXT.csv): Code, Wk, Accrue, Status, Task Title, Type, Folio,
+ * Asn, QA, Sort, and its 158 actions in its order. For a database that already has actions:
+ *  - fields are renamed / reordered / given the export's choices, never deleted (Act stays, hidden);
+ *  - a demo action that is still exactly as the project shipped it is replaced by the export's values, or removed when
+ *    the export does not have it;
+ *  - any other action with a code in the export (one a person edited or created) only has its blank cells filled;
+ *  - actions that are not in the export are kept, after the export's rows. Nothing a person typed is overwritten.
+ */
+async function backfillsV7(client: PoolClient, report: MigrationReport) {
+  const has = (await client.query("SELECT 1 FROM boss_sections WHERE slug = 'actions'")).rowCount;
+  if (!has) return;
+  const seed = TABLES.find((t) => t.slug === "actions")!;
+  await once(
+    client,
+    "v7:actions-export",
+    async () => {
+      // 1. fields
+      type Opts = { choices?: Array<{ id: string; name: string; color: string }>; [k: string]: unknown };
+      for (const [i, f] of seed.fields.entries()) {
+        const cur = await client.query<{ options: Opts }>("SELECT options FROM boss_fields WHERE table_slug = 'actions' AND key = $1", [f.key]);
+        if (!cur.rowCount) continue;
+        const options: Opts = { ...(cur.rows[0].options ?? {}) };
+        const want = (f.options ?? {}) as Opts;
+        if (want.choices) {
+          const have = options.choices ?? [];
+          for (const c of want.choices) if (!have.some((h) => h.name === c.name)) have.push(c);
+          options.choices = have;
+        }
+        if (want.help !== undefined) options.help = want.help;
+        if (want.placeholder !== undefined) options.placeholder = want.placeholder;
+        await client.query("UPDATE boss_fields SET name = $2, position = $3, options = $4::jsonb, required = $5, updated_at = NOW() WHERE table_slug = 'actions' AND key = $1", [f.key, f.name, i, JSON.stringify(options), f.key === "code"]);
+      }
+      await client.query("UPDATE boss_fields SET position = 100 + position, updated_at = NOW() WHERE table_slug = 'actions' AND key = ANY($1::text[]) AND position < 100", [ACTION_PREVIOUS_KEYS]);
+
+      // 2. who the Asn codes are
+      const contacts = await client.query<{ record_id: string; c: string }>("SELECT record_id, lower(btrim(data->>'contact')) AS c FROM boss_records WHERE section_slug = 'profiles'");
+      const byContact = new Map<string, string | null>();
+      for (const r of contacts.rows) byContact.set(r.c, byContact.has(r.c) ? null : r.record_id); // two profiles with one code: ambiguous, keep the text
+      const lookup = (c: string) => byContact.get(c.trim().toLowerCase()) ?? undefined;
+
+      // 3. rows
+      const group = await client.query<{ group_id: string }>("SELECT group_id FROM boss_groups WHERE section_slug = 'actions' ORDER BY position LIMIT 1");
+      let groupId = group.rows[0]?.group_id;
+      if (!groupId) {
+        await client.query("INSERT INTO boss_groups (section_slug, group_id, label, position) VALUES ('actions', 'all', NULL, 0)");
+        groupId = "all";
+      }
+      const existing = await client.query<{ record_id: string; data: Record<string, unknown> }>("SELECT record_id, data FROM boss_records WHERE section_slug = 'actions'");
+      const byCode = new Map(existing.rows.map((r) => [String(r.data.code ?? ""), r]));
+      const demo = new Map(LEGACY_DEMO_ACTIONS.map((d) => [d[0], d]));
+      const untouchedDemo = (data: Record<string, unknown>) => {
+        const d = demo.get(String(data.code ?? ""));
+        if (!d) return false;
+        const same = d[0] === data.code && d[1] === data.accrue && d[2] === data.title && d[3] === data.type && d[4] === data.status && d[5] === data.folio && d[6] === data.wk && d[7] === data.act && d[8] === data.qa;
+        const known = new Set(["id", "code", "accrue", "title", "type", "status", "folio", "wk", "act", "qa"]);
+        return same && Object.keys(data).every((k) => known.has(k));
+      };
+      const blank = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
+
+      let inserted = 0, replaced = 0, filled = 0, kept = 0;
+      const inExport = new Set<string>();
+      for (const [n, a] of ACTION_EXPORT.entries()) {
+        inExport.add(a.code);
+        const rec: Record<string, unknown> = {
+          code: a.code, wk: a.wk, accrue: a.accrue || null, status: a.status || null, title: a.title, type: a.type || null, folio: a.folio,
+          ...assignees(a.asn, lookup), qa: false, sort: a.sort,
+        };
+        const found = byCode.get(a.code);
+        if (!found) {
+          await client.query("INSERT INTO boss_records (section_slug, record_id, group_id, position, data) VALUES ('actions', $1, $2, $3, $4::jsonb) ON CONFLICT DO NOTHING", [a.id, groupId, n, JSON.stringify({ id: a.id, ...rec })]);
+          inserted += 1;
+          continue;
+        }
+        let patch: Record<string, unknown>;
+        if (untouchedDemo(found.data)) {
+          patch = { ...rec };
+          replaced += 1;
+        } else {
+          patch = {};
+          for (const [k, v] of Object.entries(rec)) {
+            if (k === "asnCode") continue;
+            if (k === "asn") {
+              if (blank(found.data.asn) && blank(found.data.asnCode) && !blank(v)) patch.asn = v;
+              if (blank(found.data.asn) && blank(found.data.asnCode) && rec.asnCode) patch.asnCode = rec.asnCode;
+              continue;
+            }
+            if (k === "qa") continue;
+            if (blank(found.data[k]) && !blank(v)) patch[k] = v;
+          }
+          if (Object.keys(patch).length) filled += 1; else kept += 1;
+        }
+        await client.query("UPDATE boss_records SET data = data || $2::jsonb, position = $3, updated_at = NOW() WHERE section_slug = 'actions' AND record_id = $1", [found.record_id, JSON.stringify(patch), n]);
+      }
+      // demo actions the export does not have are removed (only when still untouched); everything else follows the export
+      let removed = 0;
+      for (const r of existing.rows) {
+        const code = String(r.data.code ?? "");
+        if (inExport.has(code)) continue;
+        if (untouchedDemo(r.data)) {
+          await client.query("DELETE FROM boss_records WHERE section_slug = 'actions' AND record_id = $1", [r.record_id]);
+          removed += 1;
+        }
+      }
+      await client.query("UPDATE boss_records SET position = position + 100000 WHERE section_slug = 'actions' AND NOT (data->>'code' = ANY($1::text[]))", [ACTION_EXPORT.map((a) => a.code)]);
+
+      // 4. the main view keeps the table's own order and hides the previous fields
+      const views = await client.query<{ id: string; config: { sort?: Array<{ field: string; dir: string }>; hidden?: string[]; key?: string } }>("SELECT id, config FROM boss_views WHERE table_slug = 'actions'");
+      // only fields of the earlier layout that this database really has are hidden (a fresh database has none)
+      const present = (await client.query<{ key: string }>("SELECT key FROM boss_fields WHERE table_slug = 'actions' AND key = ANY($1::text[])", [ACTION_PREVIOUS_KEYS])).rows.map((r) => r.key);
+      for (const v of views.rows) {
+        const hidden = [...new Set([...(v.config.hidden ?? []), ...present])];
+        let config = { ...v.config, hidden };
+        const sort = v.config.sort ?? [];
+        if (v.config.key === "all" && sort.length === 1 && sort[0].field === "accrue" && sort[0].dir === "asc") config = { ...config, sort: [] };
+        await client.query("UPDATE boss_views SET config = $2::jsonb, updated_at = NOW() WHERE id = $1", [v.id, JSON.stringify(config)]);
+      }
+      const total = (await client.query<{ n: string }>("SELECT COUNT(*) AS n FROM boss_records WHERE section_slug = 'actions'")).rows[0].n;
+      await client.query("UPDATE boss_sections SET range_from = 1, range_to = $1, range_total = $1, updated_at = NOW() WHERE slug = 'actions'", [Number(total)]);
+      return `${inserted} actions added, ${replaced} demo actions replaced, ${removed} demo actions not in the export removed, ${filled} edited actions had blank cells filled, ${kept} already complete`;
+    },
+    report,
+  );
+}
+
 /**
  * Vouchers follow the full Airtable export (Vouchers-VOUCHERS - Simplified.csv):
  *  - VSF becomes a link field (it holds the voucher's record link) and Scans an attachment field;
@@ -632,6 +779,7 @@ export async function applyBaseMigrations(pool: Pool, opts: { freshSeed?: boolea
     await backfillsV4(client, report);
     await backfillsV5(client, report);
     await backfillsV6(client, report);
+    await backfillsV7(client, report);
     await ensureSequenceIndexes(client, report);
     // Autonumber counters for every table (fields added by an operator later get one on first use).
     for (const seed of TABLES) {

@@ -35,20 +35,20 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
   describe("Code sequence", () => {
     it("the next code is one more than the highest existing code, not the record count", async () => {
       const b = await bundle("actions");
-      assert.equal(b.records.length, 16);
+      assert.equal(b.records.length, 158);
       assert.ok(b.records.some((r) => r.code === "A-4642"), "existing codes are preserved by the migration");
-      assert.equal((await call("GET", "tables/actions/next/code")).json.value, "A-4702", "highest existing is A-4701 (gaps below it are not refilled)");
+      assert.equal((await call("GET", "tables/actions/next/code")).json.value, "A-4771", "highest existing is A-4770 (gaps below it are not refilled)");
       const first = await newAction();
       assert.equal(first.status, 201);
-      assert.equal(first.json.code, "A-4702");
-      assert.equal((await call("GET", "tables/actions/next/code")).json.value, "A-4703");
-      assert.equal((await newAction()).json.code, "A-4703");
+      assert.equal(first.json.code, "A-4771");
+      assert.equal((await call("GET", "tables/actions/next/code")).json.value, "A-4772");
+      assert.equal((await newAction()).json.code, "A-4772");
     });
 
     it("a code sent by the client is ignored: the server decides", async () => {
       const r = await newAction({ code: "A-1" });
       assert.equal(r.status, 201);
-      assert.equal(r.json.code, "A-4704");
+      assert.equal(r.json.code, "A-4773");
     });
 
     it("an existing code is never regenerated or changed by an update", async () => {
@@ -218,19 +218,29 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
       await parity("actions", [rule("status", "isAnyOf", { values: ["Queue", "Ongoing"] })]);
       await parity("actions", [rule("status", "isNoneOf", { values: ["Queue"] })]);
       await parity("actions", [rule("type", "isNot", { value: "Notice" })]);
-      await parity("actions", [rule("accrue", "between", { value: "2026-07-08", value2: "2026-07-12" })]);
+      await parity("actions", [rule("accrue", "between", { value: "2026-07-08", value2: "2026-07-24" })]);
       await parity("actions", [rule("accrue", "between", { value: "2026-07-14", value2: "" })]);
       await parity("actions", [rule("accrue", "before", { value: "2026-07-08" })]);
       await parity("actions", [rule("accrue", "after", { value: "2026-07-15" })]);
       await parity("actions", [rule("accrue", "is", { value: "2026-07-06" })]);
-      await parity("actions", [rule("title", "contains", { value: "deploy" })]);
-      await parity("actions", [rule("title", "notContains", { value: "deploy" })]);
+      await parity("actions", [rule("title", "contains", { value: "monday" })]);
+      await parity("actions", [rule("title", "notContains", { value: "monday" })]);
       await parity("actions", [rule("code", "is", { value: "a-4642" })]);
-      await parity("actions", [rule("act", "is", { value: true })]);
+      await parity("actions", [rule("asn", "isAnyOf", { values: [eje, jad] })]);
+      await parity("actions", [rule("asn", "isNoneOf", { values: [eje] })]);
+      await parity("actions", [rule("asn", "isEmpty")]);
+      await parity("actions", [rule("asn", "is", { value: jad })]);
+      await parity("actions", [rule("sort", "between", { value: 1, value2: 5 })]);
+      await parity("actions", [rule("sort", "gt", { value: 10 })]);
+      await parity("actions", [rule("sort", "isEmpty")]);
+      await parity("actions", [rule("accrue", "isEmpty")]);
+      await parity("actions", [rule("status", "isAnyOf", { values: ["Priority", "Review", "NOW"] })]);
+      await parity("actions", [rule("type", "is", { value: "Tasking" }), rule("folio", "contains", { value: "FEMA" })]);
+      await parity("actions", [rule("title", "contains", { value: "🧾" })]);
       await parity("actions", [rule("qa", "is", { value: false })]);
       await parity("actions", [rule("wk", "isEmpty")]);
       await parity("actions", [rule("wk", "isNotEmpty")]);
-      await parity("actions", [rule("status", "is", { value: "Queue" }), rule("act", "is", { value: false })]);
+      await parity("actions", [rule("status", "is", { value: "Queue" }), rule("qa", "is", { value: false })]);
       await parity("actions", [rule("status", "is", { value: "Queue" }), rule("type", "is", { value: "Notice", join: "or" })]);
       await parity("items", [rule("qty", "between", { value: 50, value2: 120 })]);
       await parity("items", [rule("qty", "gt", { value: 100 })]);
@@ -389,6 +399,102 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     assert.equal(v(11580).voucherNote, "My own note, typed by a person", "a note a person wrote is never replaced");
     assert.equal(v(11580).vsf, "https://my.example/own-link", "a link a person set is kept");
     assert.deepEqual((await applyBaseMigrations(db.pool)).backfills, [], "running it again changes nothing");
+  });
+
+  it("Actions follow the export: its 10 columns in order, 158 actions in the export's order, Asn linked to team profiles", async () => {
+    const b = await bundle("actions");
+    assert.deepEqual(b.fields.map((f) => f.name), ["Code", "Wk", "Accrue", "Status", "Task Title", "Type", "Folio", "Asn", "QA", "Sort"]);
+    assert.deepEqual(b.fields.filter((f) => f.required).map((f) => f.key), ["code"], "only the generated Code is required");
+    const f = (k: string) => b.fields.find((x) => x.key === k)!;
+    assert.equal(f("asn").type, "link");
+    assert.equal(f("asn").options.multiple, true);
+    assert.equal(f("sort").type, "number");
+    assert.equal(f("qa").type, "checkbox");
+    assert.equal(f("status").options.choices!.length, 10);
+    assert.equal(f("type").options.choices!.length, 18);
+    assert.deepEqual(f("status").options.choices!.slice(0, 3).map((c) => c.name), ["Ongoing", "Queue", "Scheduled"]);
+    const { ACTION_EXPORT } = await import("@/data/actionsExport");
+    const exported = new Set(ACTION_EXPORT.map((a) => a.code));
+    assert.deepEqual(b.records.filter((r) => exported.has(String(r.code))).map((r) => r.code), ACTION_EXPORT.map((a) => a.code), "the export's order (actions other tests created come after)");
+    const profiles = (await bundle("profiles")).records;
+    const id = (c: string) => profiles.find((p) => p.contact === c)!.id;
+    const a = (code: string) => b.records.find((r) => r.code === code)!;
+    assert.deepEqual(a("A-4666").asn, [id("AES")]);
+    assert.deepEqual(a("A-4672").asn, [id("JAD"), id("AES")]);
+    assert.deepEqual([a("A-4314").asn, a("A-4314").asnCode], [[], "LMF"]);
+    assert.equal(b.views.find((v) => v.config.key === "all")!.config.sort.length, 0, "All Actions keeps the export's order");
+    // an action needs nothing but a title to be saved now; values are still checked
+    assert.equal((await call("POST", "tables/actions/records", { title: "Only a title" })).status, 201);
+    assert.equal((await call("POST", "tables/actions/records", { status: "Nope" })).status, 422);
+    assert.equal((await call("POST", "tables/actions/records", { sort: -1 })).status, 422);
+    const notTeam = (await call("POST", "tables/profiles/records", { contact: "NTA", name: "Not Team A", position: "x", type: "Rep", email: "nta@example.com", team: false })).json;
+    assert.equal((await call("POST", "tables/actions/records", { asn: [notTeam.id] })).status, 422, "only team members can be assigned");
+    assert.equal((await call("POST", "tables/actions/records", { asn: [id("EJE"), id("BEM")], sort: 3, type: "Phone", status: "Priority" })).status, 201);
+  });
+
+  it("upgrades a database that has the 16 demo actions: untouched demo rows are replaced or removed, edits are kept, nothing typed is lost", async () => {
+    const { applyBaseMigrations } = await import("./migrate");
+    const { ACTION_EXPORT } = await import("@/data/actionsExport");
+    const q = db.pool.query.bind(db.pool);
+    // ---- the earlier state
+    await q("DELETE FROM boss_records WHERE section_slug = 'actions'");
+    await q("DELETE FROM boss_fields WHERE table_slug = 'actions' AND key IN ('asn', 'sort')");
+    await q("UPDATE boss_fields SET name = 'Title' WHERE table_slug = 'actions' AND key = 'title'");
+    await q("UPDATE boss_fields SET required = TRUE WHERE table_slug = 'actions' AND key IN ('accrue', 'title', 'type', 'status')");
+    await q(`UPDATE boss_fields SET options = '{"choices":[{"id":"c1","name":"Ongoing","color":"red"},{"id":"c2","name":"Queue","color":"purple"},{"id":"c3","name":"Scheduled","color":"cyan"}]}'::jsonb WHERE table_slug = 'actions' AND key = 'status'`);
+    await q(`UPDATE boss_fields SET options = '{"choices":[{"id":"t1","name":"Tasking","color":"blue"},{"id":"t2","name":"Training","color":"orange"},{"id":"t3","name":"Notice","color":"yellow"}]}'::jsonb WHERE table_slug = 'actions' AND key = 'type'`);
+    await q("INSERT INTO boss_fields (table_slug, key, name, type, options, position) VALUES ('actions', 'act', 'Act', 'checkbox', '{}', 7) ON CONFLICT DO NOTHING");
+    await q(`UPDATE boss_views SET config = jsonb_set(config, '{sort}', '[{"field":"accrue","dir":"asc"}]'::jsonb) WHERE table_slug = 'actions' AND config->>'key' = 'all'`);
+    await q("DELETE FROM boss_migrations WHERE id = 'v7:actions-export'");
+    const group = (await q("SELECT group_id FROM boss_groups WHERE section_slug = 'actions' LIMIT 1")).rows[0].group_id;
+    const demo: Array<[string, string, string, string, string, string, string, boolean, boolean]> = [
+      ["A-4642", "2026-07-06", "Review S14 Telemetry Reports", "Tasking", "Ongoing", "FL-1002", "26.28", true, true],
+      ["A-4643", "2026-07-06", "Update Onboarding Guidelines", "Training", "Queue", "FL-1004", "26.28", false, false],
+      ["A-4645", "2026-07-07", "Draft QA Deployment Notice", "Notice", "Scheduled", "FL-1005", "26.29", true, false],
+      ["A-4650", "2026-07-07", "API Compliance Test Run", "Tasking", "Ongoing", "FL-1012", "26.29", true, true],
+      ["A-4652", "2026-07-08", "Database Indexing Protocols", "Tasking", "Queue", "FL-1001", "26.30", false, false],
+    ];
+    const ins = (data: Record<string, unknown>, pos: number) => q("INSERT INTO boss_records (section_slug, record_id, group_id, position, data) VALUES ('actions', $1, $2, $3, $4::jsonb)", [data.id, group, pos, JSON.stringify(data)]);
+    for (const [n, d] of demo.entries()) await ins({ id: d[0], code: d[0], accrue: d[1], title: d[2], type: d[3], status: d[4], folio: d[5], wk: d[6], act: d[7], qa: d[8] }, n);
+    await q(`UPDATE boss_records SET data = data || '{"title":"Edited by a person"}'::jsonb WHERE section_slug = 'actions' AND record_id = 'A-4645'`); // in the export, edited
+    await q(`UPDATE boss_records SET data = data || '{"title":"My own action"}'::jsonb WHERE section_slug = 'actions' AND record_id = 'A-4650'`); // not in the export, edited
+    await ins({ id: "A-4900", code: "A-4900", title: "Added by a person", status: "Queue" }, 10);
+
+    const report = await applyBaseMigrations(db.pool);
+    assert.ok(report.backfills.some((x) => x.id === "v7:actions-export"), JSON.stringify(report.backfills));
+    const b = await bundle("actions");
+    const a = (code: string) => b.records.find((r) => r.code === code);
+    const profiles = (await bundle("profiles")).records;
+    const id = (c: string) => profiles.find((p) => p.contact === c)!.id;
+
+    // fields
+    assert.deepEqual(b.fields.slice(0, 10).map((f) => f.name), ["Code", "Wk", "Accrue", "Status", "Task Title", "Type", "Folio", "Asn", "QA", "Sort"]);
+    assert.deepEqual(b.fields.filter((f) => f.required).map((f) => f.key), ["code"]);
+    assert.ok(b.fields.find((f) => f.key === "act" && f.position >= 100), "the previous Act field is kept, after the export's columns");
+    assert.deepEqual(b.fields.find((f) => f.key === "status")!.options.choices!.slice(0, 3).map((c) => c.name), ["Ongoing", "Queue", "Scheduled"], "the original choices keep their place");
+    assert.equal(b.fields.find((f) => f.key === "status")!.options.choices!.length, 10);
+    assert.equal(b.fields.find((f) => f.key === "type")!.options.choices!.length, 18);
+    const all = b.views.find((v) => v.config.key === "all")!;
+    assert.equal(all.config.sort.length, 0);
+    assert.ok(all.config.hidden.includes("act"));
+
+    // rows
+    assert.equal(b.records.length, 158 + 2, "158 from the export + the edited demo action that is not in it + the one a person added");
+    assert.deepEqual(b.records.slice(0, 158).map((r) => r.code), ACTION_EXPORT.map((x) => x.code), "the export's order comes first");
+    assert.deepEqual(b.records.slice(158).map((r) => r.code).sort(), ["A-4650", "A-4900"]);
+    assert.equal(a("A-4642")!.title, ACTION_EXPORT.find((x) => x.code === "A-4642")!.title, "an untouched demo action took the export's values");
+    assert.deepEqual(a("A-4642")!.asn, [id("JAD")]);
+    assert.equal(a("A-4642")!.accrue, null);
+    assert.equal(a("A-4643"), undefined, "an untouched demo action the export does not have was removed");
+    assert.equal(a("A-4652"), undefined);
+    assert.equal(a("A-4645")!.title, "Edited by a person", "an edited action keeps what a person typed");
+    assert.equal(a("A-4645")!.status, "Scheduled");
+    assert.deepEqual(a("A-4645")!.asn, [id("RL3")], "…and its blank Asn was filled from the export");
+    assert.equal(a("A-4650")!.title, "My own action");
+    assert.equal(a("A-4900")!.title, "Added by a person");
+    assert.equal(a("A-4900")!.status, "Queue");
+    assert.deepEqual((await applyBaseMigrations(db.pool)).backfills, [], "running it again changes nothing");
+    assert.ok(Number((await call("GET", "tables/actions/next/code")).json.value.slice(2)) > 4900, "numbering continues after the highest code (and never reuses an issued one)");
   });
 
   it("the migration reports no warnings on a fresh database and creates the code indexes", async () => {

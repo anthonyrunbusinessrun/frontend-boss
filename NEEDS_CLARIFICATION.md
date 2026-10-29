@@ -133,3 +133,14 @@ still has its own Work / Vouchers category in its builder and create dialog and 
 - The export's Manifest cell is a comma-joined list in which items containing a comma are quoted; the data is stored one line per row (`scripts/vouchers-csv-to-seed.py` does the conversion and can be run again on a newer export).
 - Existing databases: `npm run db:migrate` completes only what is still the old seed value (a note cut to its first line, "Unnamed manifest", the placeholder VSF). A note, link or manifest a person edited is kept. An old numeric Scans value is kept in the record as `scansCount`. A voucher that was deleted is not brought back.
 - The voucher document now prints the full Notes (bold labels) and wraps long note lines as the sample PDFs do.
+
+## 12. Actions from the Airtable export (Actions-OPEN ACTIONS - HOT QA NEXT.csv)
+
+- The table follows the export's 10 headers in its order; the earlier **Act** checkbox is not in it (kept, hidden, in databases that have it). The earlier **Title** is now **Task Title**.
+- Nothing is required except the generated Code: the export has actions with no title, status, type or date (for example "Untitled Action" rows and undated "Action" rows).
+- **Asn** is a multi-link to team profiles (two rows have two people). The export's `LMF` is not a profile, so it stays as text on that action until a profile with that Contact exists. **Folio** stays text: the export's folio names (for example "FEMA Infant & Toddler Kits") are not rows of the app's Folios table.
+- **Wk** is text (`26.28`, `Action`). **Sort** is a whole number. **QA** is empty in the export, so every action starts unchecked.
+- Status and Type offer every value used in the export; add more in the field settings.
+- Whitespace around values is trimmed (Task Title, Asn, Folio). The export quotes a Folio that contains a comma (`/// Ray Land, Inc.`); the quotes are removed.
+- "All Actions" no longer sorts by Accrue: the export lists the actions grouped by assignee, then by week and date, and most have no date. The order is kept; sort in the view if you want another.
+- Existing databases: the 16 demo actions the project shipped with (for example "Review S14 Telemetry Reports") are replaced or removed only while untouched. Anything a person edited is kept, with blanks filled; actions added later are kept after the export's. Deleted actions are not brought back.

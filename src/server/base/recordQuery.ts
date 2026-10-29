@@ -77,7 +77,12 @@ function isEmptySql(f: FieldDef, p: Params): string {
     return `(CASE jsonb_typeof(${j}) WHEN 'array' THEN jsonb_array_length(${j}) = 0 WHEN 'string' THEN ${j} #>> '{}' = '' ELSE true END)`;
   }
   const v = valueExpr(f, p);
-  if (v.kind === "json") return `(${v.sql} IS NULL OR ${v.sql} = 'null'::jsonb OR ${v.sql} = '[]'::jsonb)`;
+  if (v.kind === "json") {
+    const none = `(${v.sql} IS NULL OR ${v.sql} = 'null'::jsonb OR ${v.sql} = '[]'::jsonb)`;
+    // a link whose people are not profiles yet keeps them as text (legacyKey): that is not empty
+    if (f.type === "link" && f.options.legacyKey) return `(${none} AND COALESCE(btrim(r.data->>${p.add(f.options.legacyKey)}), '') = '')`;
+    return none;
+  }
   if (f.type === "link") {
     const legacy = f.options.legacyKey ? `COALESCE(btrim(r.data->>${p.add(f.options.legacyKey)}), '') = ''` : "TRUE";
     return `(COALESCE(btrim(${v.sql}), '') = '' AND ${legacy})`;
