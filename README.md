@@ -13,10 +13,16 @@ npm run db:migrate                  # schema + definitions + one-time backfills;
 npm run dev                         # http://localhost:3000
 npm run build && npm start          # `start` runs the migration first
 npm run lint                        # tsc --noEmit
-npm test                            # unit tests, plus PostgreSQL integration tests when DATABASE_URL is set
+npm test                            # unit tests; integration tests require TEST_DATABASE_URL on localhost
 ```
 
 `DATABASE_URL` is **required**: every table screen reads and writes PostgreSQL. Node 20+.
+
+CI runs the dependency audit, TypeScript check, unit and PostgreSQL integration tests, and a production
+build on Node 24. Integration tests use a disposable local PostgreSQL service, never production credentials.
+Locally, set `TEST_DATABASE_URL=postgres://test_user:password@127.0.0.1:5432/postgres` only for an isolated
+test server with CREATE DATABASE rights. Remote test URLs are rejected; `DATABASE_URL` is ignored by tests.
+The tests create and drop uniquely named `boss_test_*` databases, not the database in the URL.
 The integration tests create and drop their own throwaway database, so the URL needs `CREATE DATABASE` rights.
 
 Browser end-to-end checks (Playwright for Python, Chromium):
@@ -144,11 +150,17 @@ are unchanged.
 
 ## Security notes — read before going live
 
-- **There is no real authentication.** Sign-in and sign-up remain the original mock screens. For favorites and
-  personal views the browser receives an anonymous id in an httpOnly cookie. Writes also require a same-origin
-  request, which stops cross-site requests but **does not stop anyone who can reach the site**. Put real
-  authentication in front of the app (or replace `userId` in `src/server/base/api.ts` with your session user)
-  before exposing it.
+- **Invite-only Supabase Auth.** Workspace pages, table reads/writes, legacy record reads, and uploaded files
+  require a server-verified, confirmed email listed in `BOSS_ADMIN_EMAILS`. Current access is administrator-level;
+  staff/partner roles are not implemented. User-editable metadata and the old anonymous `boss_uid` cookie are
+  never authorization evidence. Auth cookies are HttpOnly, Secure in production, SameSite=Lax, and never cached.
+- Browser writes require an exact `BOSS_APP_ORIGIN` match. Existing service integrations may use
+  `API_WRITE_TOKEN`; treat that token as a privileged credential. Legacy mutation/import routes remain token-only.
+- Invitations and recovery links open a confirmation page; a deliberate POST consumes the one-time token,
+  protecting against email link scanners. Password setup requires at least 12 characters. Configure the
+  invitation/recovery templates as documented in `docs/OPERATIONS.md`. Disable public signup in Supabase.
+- Old anonymous favorites and personal views are preserved, but are not automatically assigned to the next
+  person signing in. An administrator must review ownership before a controlled reassignment.
 - Uploaded files are never served as HTML or SVG, are sent with `nosniff` and a locked-down CSP, and are
   limited to an allow-list of types.
 - All record input is validated on the server (types, required, options, uniqueness, links); the browser only
@@ -159,8 +171,13 @@ are unchanged.
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection (Railway injects it) |
+| `SUPABASE_URL` | Supabase Auth project URL; server-only configuration |
+| `SUPABASE_PUBLISHABLE_KEY` | Publishable key, never the secret/service-role key |
+| `BOSS_APP_ORIGIN` | Exact browser origin, e.g. `https://your-app.example` |
+| `BOSS_ADMIN_EMAILS` | Comma-separated approved administrator emails; empty means no browser access |
+| `TEST_DATABASE_URL` | Isolated localhost PostgreSQL for integration tests only |
 | `API_WRITE_TOKEN` | bearer token for scripts calling `/api/records` and `/api/base` writes |
-| `PGSSLMODE=require` | for providers whose public endpoint needs TLS |
+| `PGSSLMODE=require` | Legacy compatibility only: disables certificate verification; do not use in production |
 | `PG_POOL_MAX` | pool size (default 10) |
 | `BOSS_SERVER_QUERY_THRESHOLD` | records above which a table is filtered on the server (default 3000) |
 | `BOSS_SERVER_PAGE` | records per page in that mode (default 200) |

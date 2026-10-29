@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { TableApp } from "@/components/base/TableApp";
 import styles from "@/components/base/base.module.css";
 import { isSectionSlug, SECTIONS } from "@/lib/sections";
 import { requireDb } from "@/lib/db";
-import { isSessionId, SESSION_COOKIE } from "@/server/base/api";
+import { requireUser } from "@/server/auth/server";
 import { getBundle } from "@/server/base/store";
 
 export const dynamicParams = false;
@@ -25,6 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
  * from PostgreSQL and hands it to the client workspace. All edits go through /api/base.
  */
 export default async function SectionPage({ params, searchParams }: { params: Promise<{ section: string }>; searchParams: Promise<{ view?: string; record?: string }> }) {
+  const user = await requireUser();
   const { section } = await params;
   if (!isSectionSlug(section)) notFound();
   const { view, record } = await searchParams;
@@ -38,7 +38,6 @@ export default async function SectionPage({ params, searchParams }: { params: Pr
       </div>
     );
   }
-  const cookie = (await cookies()).get(SESSION_COOKIE)?.value;
-  const bundle = await getBundle(requireDb(), section, isSessionId(cookie) ? cookie : null);
+  const bundle = await getBundle(requireDb(), section, user.id);
   return <TableApp bundle={bundle} initialViewId={view} initialRecordId={record} />;
 }

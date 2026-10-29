@@ -9,7 +9,7 @@ import { useGlobalSearch } from "./SearchContext";
 import styles from "./shell.module.css";
 
 /** Top header — Components/top-header.png. Avatar opens the account menu; the search box filters the current table. */
-export function TopHeader() {
+export function TopHeader({ email }: { email?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { query, setQuery } = useGlobalSearch();
   return (
@@ -40,8 +40,8 @@ export function TopHeader() {
         </label>
         <div className={styles.user}>
           <div className={styles.userText}>
-            <p className={styles.userName}>RayLand</p>
-            <p className={styles.userRole}>CEO</p>
+            <p className={styles.userName}>{email?.split('@')[0] ?? 'BOSS'}</p>
+            <p className={styles.userRole}>Administrator</p>
           </div>
           <Popover
             open={menuOpen}
@@ -52,11 +52,11 @@ export function TopHeader() {
             panelStyle={{ top: "calc(100% + 10px)" }}
             trigger={
               <button type="button" className={styles.avatarBtn} aria-haspopup="dialog" aria-expanded={menuOpen} aria-label="Account menu" onClick={() => setMenuOpen((o) => !o)}>
-                RL
+                {email?.slice(0, 2).toUpperCase() ?? 'BO'}
               </button>
             }
           >
-            <ProfileMenu />
+            <ProfileMenu name={email?.split('@')[0]} email={email} initials={email?.slice(0, 2).toUpperCase()} />
           </Popover>
         </div>
       </div>

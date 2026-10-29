@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { authorizeMutation, createRecord, getRecordSet, isDataSection } from "@/server/records";
+import { apiIdentity } from "@/server/auth/server";
 
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ section: string }> };
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(request: Request, { params }: RouteContext) {
+  if (!await apiIdentity(request)) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   const { section } = await params;
   if (!isDataSection(section)) return NextResponse.json({ error: "Unknown section" }, { status: 404 });
 

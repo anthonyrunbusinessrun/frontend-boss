@@ -7,13 +7,14 @@ import { seedDatabase } from "../../../scripts/seed-data";
 import type { FieldDef, RecordRow, TableBundle, ViewDef } from "@/lib/base/types";
 import { handleApi, newSessionId } from "./api";
 import { applyBaseMigrations } from "./migrate";
+import { testDatabaseUrl } from "./testDatabaseUrl";
 
 /**
  * Integration tests: a throwaway database is created from db/schema.sql + the seed + the migrations, and the
- * real API handler runs against it. Skipped when DATABASE_URL is not set (set it to any reachable Postgres
- * with CREATE DATABASE rights).
+ * real API handler runs against it. Requires TEST_DATABASE_URL pointing to an isolated local Postgres
+ * with CREATE DATABASE rights. Production DATABASE_URL is never used.
  */
-const ADMIN_URL = process.env.DATABASE_URL;
+const ADMIN_URL = testDatabaseUrl();
 const skip = !ADMIN_URL;
 
 let admin: Pool;
@@ -63,6 +64,12 @@ describe("table engine API (PostgreSQL)", { skip }, () => {
     assert.equal(r1.fieldsAdded + r1.viewsAdded + r2.fieldsAdded + r2.viewsAdded, 0);
     assert.equal(r2.backfills.length, 0);
     assert.equal((await pool.query("SELECT COUNT(*)::int n FROM boss_records")).rows[0].n, before);
+  });
+
+  it("indexes the view-section and favorite-table foreign keys", async () => {
+    const { rows } = await pool.query(`SELECT indexname FROM pg_indexes WHERE schemaname = 'public'
+      AND indexname IN ('boss_views_section_idx', 'boss_favorites_table_idx')`);
+    assert.equal(rows.length, 2);
   });
 
   it("legacy Cord / Category text was linked to profile and category records, and the old text is kept", async () => {
