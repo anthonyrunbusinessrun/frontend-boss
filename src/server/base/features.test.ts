@@ -6,12 +6,13 @@ import { after, before, describe, it } from "node:test";
 import { applyFilters, applySort, matchesSearch } from "@/lib/base/query";
 import type { FilterRule, RecordRow, SortRule, TableBundle } from "@/lib/base/types";
 import { createTestDb, makeCaller, USER_A } from "./testDb";
+import { testDatabaseUrl } from "./testDatabaseUrl";
 
 /**
  * Integration tests for: automatic Code sequences, Forms category, voucher PDFs (original + generated) and
- * server-side filtering. Needs DATABASE_URL (any PostgreSQL where CREATE DATABASE is allowed); skipped otherwise.
+ * server-side filtering. Needs TEST_DATABASE_URL (isolated local PostgreSQL); skipped otherwise.
  */
-const ADMIN_URL = process.env.DATABASE_URL;
+const ADMIN_URL = testDatabaseUrl();
 const skip = !ADMIN_URL;
 
 let db: Awaited<ReturnType<typeof createTestDb>>;

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Bell,
   Cpu,
@@ -60,7 +62,7 @@ const GROUPS: Item[][] = [
 
 /**
  * Account menu — Cards:Modals/profile-dropdown-container-shadow.png.
- * "Log out" returns to sign-in; every other entry is NEEDS CLARIFICATION (no destination designed).
+ * Log out revokes this Supabase session; other entries remain placeholders.
  */
 export function ProfileMenu({ name = "RayLand", email = "RayLand@runbusiness.com", initials = "RL" }: { name?: string; email?: string; initials?: string }) {
   return (
@@ -97,6 +99,15 @@ export function ProfileMenu({ name = "RayLand", email = "RayLand@runbusiness.com
               </>
             );
             const cls = cn(styles.profileItem, it.active && styles.profileActive, it.danger && styles.profileDanger);
+            if (it.label === 'Log out') return (
+              <button key={it.label} type="button" className={cls} onClick={async () => {
+                try {
+                  const res = await fetch('/api/auth/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+                  if (!res.ok) throw new Error('Sign-out failed');
+                  window.location.assign('/sign-in');
+                } catch { window.alert('Unable to sign out. Please try again.'); }
+              }}>{content}</button>
+            );
             return it.href ? (
               <Link key={it.label} href={it.href} className={cls}>
                 {content}

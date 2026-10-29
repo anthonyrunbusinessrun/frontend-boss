@@ -1,33 +1,42 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, type FormEvent } from "react";
-import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/ui/TextField";
-import { DEFAULT_SECTION } from "@/lib/sections";
-import styles from "./auth.module.css";
+import Image from 'next/image';
+import Link from 'next/link';
+import { useState, type FormEvent } from 'react';
+import { Button } from '@/components/ui/Button';
+import { TextField } from '@/components/ui/TextField';
+import { DEFAULT_SECTION } from '@/lib/sections';
+import styles from './auth.module.css';
 
-/**
- * Sign-in / sign-up card (Screens/01 and 02).
- * There is no backend, so submitting only navigates into the workspace.
- * NEEDS CLARIFICATION: validation, error states, "Forgot Password?" destination and post-login landing page.
- */
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
-  const router = useRouter();
-  const isSignIn = mode === "sign-in";
+type Mode = 'sign-in' | 'sign-up' | 'recover' | 'password' | 'confirm';
 
-  // The workspace is the only destination after authentication. Warm that one
-  // route while the user fills the form instead of waiting after submission.
-  useEffect(() => {
-    router.prefetch(`/${DEFAULT_SECTION}`);
-  }, [router]);
+export function AuthForm({ mode, tokenHash, tokenType }: { mode: Mode; tokenHash?: string; tokenType?: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const heading = { 'sign-in': 'Sign in to your account', 'sign-up': 'Access is by invitation',
+    recover: 'Reset your password', password: 'Set your BOSS password', confirm: 'Confirm your BOSS access' }[mode];
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    router.push(`/${DEFAULT_SECTION}`);
-  };
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(''); setMessage('');
+    const fields = new FormData(event.currentTarget);
+    const password = String(fields.get('password') ?? '');
+    if (mode === 'password' && password !== fields.get('confirm')) {
+      setError('The passwords do not match.'); setBusy(false); return;
+    }
+    const action = mode === 'sign-in' ? 'login' : mode;
+    try {
+      const response = await fetch(`/api/auth/${action}`, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: fields.get('email'), password, token_hash: tokenHash, type: tokenType }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'Please try again.');
+      if (mode === 'recover') { setMessage(result.message); return; }
+      // Remove invitation/recovery secrets from browser history, and discard cached workspace data.
+      window.location.replace(mode === 'confirm' ? '/set-password' : `/${DEFAULT_SECTION}`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to connect. Please try again.'); }
+    finally { setBusy(false); }
+  }
 
   return (
     <main className={styles.page}>
@@ -37,35 +46,26 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           <span className={styles.brandName}>BOSS</span>
         </div>
         <p className={styles.subtitle}>Business Operating Systems Solutions</p>
-        <h1 className={styles.heading}>{isSignIn ? "Sign in to your account" : "Create your BOSS account"}</h1>
-        <form className={styles.form} onSubmit={onSubmit}>
-          {isSignIn ? (
-            <>
-              {/* The design shows these filled in; they are mock values. */}
-              <TextField label="Email Address" type="email" name="email" autoComplete="username" defaultValue="rayland@ray-land.com" required />
-              <TextField label="Password" reveal name="password" autoComplete="current-password" defaultValue="password" required />
-              <a className={styles.forgot} href="#forgot-password">
-                Forgot Password?
-              </a>
-              <Button type="submit" size="auth" className={styles.submit}>
-                Sign In
-              </Button>
-            </>
-          ) : (
-            <>
-              <TextField label="Full Name" name="name" placeholder="First and last name" autoComplete="name" required />
-              <TextField label="Email Address" type="email" name="email" placeholder="name@company.com" autoComplete="email" required />
-              <TextField label="Password" reveal name="password" placeholder="At least 8 characters" autoComplete="new-password" minLength={8} required />
-              <TextField label="Confirm Password" type="password" name="confirm" placeholder="Re-enter your password" autoComplete="new-password" required />
-              <Button type="submit" size="auth" className={styles.submit}>
-                Create Account
-              </Button>
-            </>
-          )}
-        </form>
+        <h1 className={styles.heading}>{heading}</h1>
+        {mode === 'sign-up' ? <p>Contact your BOSS administrator to request access. Public registration is disabled.</p> : (
+          <form className={styles.form} onSubmit={onSubmit}>
+            {(mode === 'sign-in' || mode === 'recover') && <TextField label="Email Address" type="email" name="email" autoComplete="username" required maxLength={254} disabled={busy} />}
+            {(mode === 'sign-in' || mode === 'password') && <TextField label="Password" reveal name="password" autoComplete={mode === 'password' ? 'new-password' : 'current-password'} minLength={mode === 'password' ? 12 : undefined} maxLength={256} required disabled={busy} />}
+            {mode === 'password' && <>
+              <TextField label="Confirm Password" reveal name="confirm" autoComplete="new-password" minLength={12} maxLength={256} required disabled={busy} />
+              <p>Use at least 12 characters. A long, unique passphrase is recommended.</p>
+            </>}
+            {mode === 'confirm' && <p>Continue to accept your invitation or reset your password. This link can only be used once.</p>}
+            {error && <p role="alert">{error}</p>}
+            {message && <p role="status">{message}</p>}
+            <Button type="submit" size="auth" className={styles.submit} disabled={busy}>
+              {busy ? 'Please wait…' : mode === 'sign-in' ? 'Sign In' : mode === 'recover' ? 'Send recovery email' : mode === 'password' ? 'Save password' : 'Continue securely'}
+            </Button>
+            {mode === 'sign-in' && <Link className={styles.forgot} href="/forgot-password">Forgot Password?</Link>}
+          </form>
+        )}
         <p className={styles.switch}>
-          {isSignIn ? "Don't have an account?" : "Already have an account?"}
-          <Link href={isSignIn ? "/sign-up" : "/sign-in"}>{isSignIn ? "Sign Up" : "Sign In"}</Link>
+          <Link href={mode === 'sign-in' ? '/sign-up' : '/sign-in'}>{mode === 'sign-in' ? 'Need access?' : 'Back to sign in'}</Link>
         </p>
       </div>
     </main>

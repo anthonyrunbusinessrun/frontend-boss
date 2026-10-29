@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS boss_views (
 );
 
 CREATE INDEX IF NOT EXISTS boss_views_table_idx ON boss_views(table_slug, position);
+CREATE INDEX IF NOT EXISTS boss_views_section_idx ON boss_views(section_id);
 
 CREATE TABLE IF NOT EXISTS boss_favorites (
   owner_id TEXT NOT NULL,
@@ -134,6 +135,7 @@ CREATE TABLE IF NOT EXISTS boss_favorites (
 );
 
 CREATE INDEX IF NOT EXISTS boss_favorites_owner_table_idx ON boss_favorites(owner_id, table_slug, position);
+CREATE INDEX IF NOT EXISTS boss_favorites_table_idx ON boss_favorites(table_slug);
 
 -- Uploaded attachments (profile pictures, QR codes, files). Bytes live in the database so a
 -- Railway deploy needs no extra storage service.

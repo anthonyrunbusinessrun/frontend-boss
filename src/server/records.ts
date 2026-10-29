@@ -1,6 +1,7 @@
 import "server-only";
 import type { RecordGroup, RecordSet } from "@/types";
 import { requireDb } from "@/lib/db";
+import { hasServiceToken } from "@/server/auth/policy";
 
 export const sectionNames = {
   profiles: "Profiles",
@@ -106,7 +107,5 @@ export async function deleteRecord(section: DataSection, id: string) {
 }
 
 export function authorizeMutation(request: Request) {
-  const expected = process.env.API_WRITE_TOKEN;
-  if (!expected) return process.env.NODE_ENV !== "production";
-  return request.headers.get("authorization") === `Bearer ${expected}`;
+  return hasServiceToken(request);
 }

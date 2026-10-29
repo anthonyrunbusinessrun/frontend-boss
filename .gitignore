@@ -3,4 +3,6 @@
 !.env.example
 node_modules/
 .next/
+next-env.d.ts
+*.tsbuildinfo
 airtable-exports/

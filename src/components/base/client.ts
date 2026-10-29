@@ -15,12 +15,13 @@ export class ClientError extends Error {
 
 let sessionPromise: Promise<void> | null = null;
 
-/** Give this browser an anonymous user id (cookie). Used for favorites and personal views. */
+/** Verify the signed-in user's session before loading personal state. */
 export function ensureSession(): Promise<void> {
   if (!sessionPromise) {
     sessionPromise = fetch("/api/base/session", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
       .then((r) => {
-        if (!r.ok) throw new ClientError(r.status, "Could not start a session.");
+        if (r.status === 401) window.location.assign('/sign-in');
+        if (!r.ok) throw new ClientError(r.status, "Please sign in again.");
       })
       .catch((e) => {
         sessionPromise = null;

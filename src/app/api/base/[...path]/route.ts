@@ -1,7 +1,7 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireDb } from "@/lib/db";
-import { handleApi, isSessionId, SESSION_COOKIE, type ApiResponse } from "@/server/base/api";
+import { handleApi, type ApiResponse } from "@/server/base/api";
+import { apiIdentity } from "@/server/auth/server";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +9,9 @@ type RouteContext = { params: Promise<{ path: string[] }> };
 
 async function handle(request: Request, { params }: RouteContext) {
   const { path } = await params;
-  const jar = await cookies();
-  const cookie = jar.get(SESSION_COOKIE)?.value;
-  const userId = isSessionId(cookie) ? cookie : null;
+  const identity = await apiIdentity(request);
+  if (!identity) return NextResponse.json({ error: "Please sign in." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
+  const userId = identity.userId;
 
   let result: ApiResponse;
   try {
@@ -27,9 +27,6 @@ async function handle(request: Request, { params }: RouteContext) {
     : result.json === undefined
       ? new NextResponse(null, { status: result.status })
       : NextResponse.json(result.json, { status: result.status });
-  if (result.setUserId) {
-    response.cookies.set(SESSION_COOKIE, result.setUserId, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365 });
-  }
   response.headers.set("Cache-Control", "no-store");
   return response;
 }
