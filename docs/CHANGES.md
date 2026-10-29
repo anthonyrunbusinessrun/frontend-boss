@@ -57,11 +57,11 @@ drag-and-drop was exercised with Playwright's synthetic drags only; Airtable CSV
 - **Create menu:** redesigned launcher (tiles with icon, label, short description; groups; keyboard navigation; bottom sheet on small screens). All nine options kept.
 - **Automatic Code:** server-assigned sequential codes for Actions, Leads and Transactions, shown read-only in the side modal, safe under concurrency, never reused, unique index.
 - **Voucher PDF:** the Vouchers screen shows the one supplied `Voucher.pdf` for every voucher (in-app pdf.js preview, open, download). No PDF is generated, uploaded or replaced. Voucher detail fields taken from the sample are kept as ordinary fields.
-- **Forms category:** Work / Vouchers on form records and form views, with filtered views; existing forms default to Work.
+- **Forms Style:** the Forms table has no Category column; its **Style** column offers **Work** and **Vouchers** (default Work). “All Forms” is grouped by Style, plus “Work forms” / “Voucher forms” views. Form *views* keep a Work / Vouchers category of their own.
 - **Filtering:** shared filter panel with per-type operators (between, within, any of / none of…), pills, clear all, copy from another view, reorder, empty state, persisted per view; server-side filtering and paging for large tables.
 
 ## Database
-New: unique indexes `boss_seq_actions_code`, `boss_seq_leads_leadid`, `boss_seq_transactions_trans`. New fields (definitions only, no schema change): Forms `category`; Vouchers `voucherNo`, `docType`, `docStatus`, `headline`, `vendorCode`, `vendorAccount`, `contractNo`, `operatorCode`, `operatedBy`, `deliverPhone2`, `manifestLines`, `packLines`. One-time backfills: forms → Work, vouchers → BL / Issued, voucher view columns hidden, form-category views added, PDF field definitions (`pdf`, `generatedPdf`, `pdfStatus`) removed. Existing codes and data are preserved.
+New: unique indexes `boss_seq_actions_code`, `boss_seq_leads_leadid`, `boss_seq_transactions_trans`. New fields (definitions only, no schema change): Vouchers `voucherNo`, `docType`, `docStatus`, `headline`, `vendorCode`, `vendorAccount`, `contractNo`, `operatorCode`, `operatedBy`, `deliverPhone2`, `manifestLines`, `packLines`. One-time backfills: Forms Style gets the choice Vouchers (blank styles → Work, forms marked Vouchers in the earlier Category column keep it, the Category field definition is removed and views switch to Style), vouchers → BL / Issued, voucher view columns hidden, form-category views added, PDF field definitions (`pdf`, `generatedPdf`, `pdfStatus`) removed. Existing codes and data are preserved.
 
 ## Files
 - **Added:** `src/lib/base/{sequence,voucher}.ts`, `src/server/base/{recordQuery,testDb}.ts`, `src/components/base/{CreateMenu,FilterPanel}.tsx`, `src/components/base/vouchers/PdfPreview.tsx`, `public/vouchers/Voucher.pdf` (the supplied PDF), tests, `qa/e2e-update2.py`.
@@ -76,7 +76,7 @@ Same as before (`DATABASE_URL`, `npm run db:migrate`). Optional: `BOSS_SERVER_QU
 | Command | Result |
 | --- | --- |
 | `npm run lint` | passes |
-| `npm test` | 138 / 138 pass |
+| `npm test` | 139 / 139 pass |
 | `npm run build` | passes |
 | `python3 qa/base-e2e.py` (browser, fresh database) | 66 / 66 |
 | `python3 qa/e2e-update2.py` (browser, fresh database, with a second server-filter instance) | 34 / 34 |

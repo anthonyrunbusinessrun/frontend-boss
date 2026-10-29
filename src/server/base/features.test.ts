@@ -105,37 +105,39 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     });
   });
 
-  describe("Forms: Work / Vouchers category", () => {
-    it("existing forms were assigned Work; the field offers exactly Work and Vouchers", async () => {
+  describe("Forms: Style is Work or Vouchers", () => {
+    it("the Category column is gone; Style offers exactly Work and Vouchers; existing forms stay Work", async () => {
       const b = await bundle("forms");
-      const field = b.fields.find((f) => f.key === "category")!;
-      assert.deepEqual(field.options.choices!.map((c) => c.name), ["Work", "Vouchers"]);
-      assert.equal(field.required, true);
-      assert.ok(b.records.length >= 13 && b.records.every((r) => r.category === "Work"));
+      assert.ok(!b.fields.some((f) => f.key === "category" || f.name === "Category"), "no Category column");
+      const style = b.fields.find((f) => f.key === "style")!;
+      assert.equal(style.name, "Style");
+      assert.deepEqual(style.options.choices!.map((c) => c.name), ["Work", "Vouchers"]);
+      assert.ok(b.records.length >= 13 && b.records.every((r) => r.style === "Work"), "existing forms keep Work");
     });
 
-    it("a new form takes the chosen category, defaults to Work, rejects anything else, and can be changed", async () => {
+    it("a form's Style can be Work or Vouchers when creating and editing; anything else is refused", async () => {
       const base = { code: "ZZ", type: "Ticket", slug: "zz-form", title: "ZZ" };
-      const v = await call("POST", "tables/forms/records", { ...base, code: "VF", category: "Vouchers" });
-      assert.equal(v.json.category, "Vouchers");
+      const v = await call("POST", "tables/forms/records", { ...base, code: "VF", style: "Vouchers" });
+      assert.equal(v.json.style, "Vouchers");
       const w = await call("POST", "tables/forms/records", { ...base, code: "WF" });
-      assert.equal(w.json.category, "Work", "no category sent: default");
-      const bad = await call("POST", "tables/forms/records", { ...base, code: "BF", category: "Other" });
-      assert.equal(bad.status, 422);
-      const changed = await call("PATCH", `tables/forms/records/${w.json.id}`, { category: "Vouchers" });
-      assert.equal(changed.json.category, "Vouchers");
-      assert.equal((await call("PATCH", `tables/forms/records/${w.json.id}`, { category: "" })).status, 422, "required: it cannot be cleared");
+      assert.equal(w.json.style, "Work", "no style sent: default Work");
+      assert.equal((await call("POST", "tables/forms/records", { ...base, code: "BF", style: "Other" })).status, 422);
+      assert.equal((await call("PATCH", `tables/forms/records/${w.json.id}`, { style: "Vouchers" })).json.style, "Vouchers");
+      assert.equal((await call("PATCH", `tables/forms/records/${w.json.id}`, { style: "Work" })).json.style, "Work");
+      assert.equal((await call("PATCH", `tables/forms/records/${w.json.id}`, { style: "Nope" })).status, 422);
     });
 
-    it("category views organize forms, and new forms appear under the right one", async () => {
+    it("Style views organize forms: grouped by Style, and Work / Voucher views", async () => {
       const b = await bundle("forms");
       const keys = b.views.map((v) => v.config.key);
       for (const k of ["all", "work", "vouchers"]) assert.ok(keys.includes(k), k);
+      assert.deepEqual(b.views.find((v) => v.config.key === "all")!.config.groupBy, [{ field: "style", dir: "asc" }]);
       const vouchersView = b.views.find((v) => v.config.key === "vouchers")!;
-      assert.deepEqual(vouchersView.config.filters.map((f) => [f.field, f.op, f.value]), [["category", "is", "Vouchers"]]);
+      assert.deepEqual(vouchersView.config.filters.map((f) => [f.field, f.op, f.value]), [["style", "is", "Vouchers"]]);
       const shown = applyFilters(b.records, vouchersView.config.filters, b.fields, b.linked).map((r) => r.code);
-      assert.ok(shown.includes("VF") && shown.includes("WF"), "records switched to Vouchers show up there");
-      assert.ok(!shown.includes("JC"));
+      assert.ok(shown.includes("VF") && !shown.includes("JC") && !shown.includes("WF"));
+      const work = applyFilters(b.records, b.views.find((v) => v.config.key === "work")!.config.filters, b.fields, b.linked).map((r) => r.code);
+      assert.ok(work.includes("JC") && work.includes("WF") && !work.includes("VF"));
     });
 
     it("a Form view has its own category (separate from the view type), default Work", async () => {
@@ -310,6 +312,34 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
       assert.deepEqual(reloaded.config.filters.map((f) => [f.op, f.values ?? null, f.value2 ?? null]), [["isAnyOf", ["Queue"], null], ["between", null, "2026-07-31"]]);
       assert.equal((await bundle("actions")).records.length, before, "filtering never deletes or edits records");
     });
+  });
+
+  it("upgrades a database that still has the Category column: Vouchers carries over to Style, nothing is lost", async () => {
+    const { applyBaseMigrations } = await import("./migrate");
+    // put the forms table back into its previous state
+    await db.pool.query("INSERT INTO boss_fields (table_slug, key, name, type, options, position, required) VALUES ('forms', 'category', 'Category', 'singleSelect', $1::jsonb, 99, true) ON CONFLICT DO NOTHING", [JSON.stringify({ choices: [{ id: "ch_work", name: "Work", color: "green" }, { id: "ch_vouchers", name: "Vouchers", color: "orange" }] })]);
+    await db.pool.query(`UPDATE boss_fields SET options = '{"choices":[{"id":"ch_work","name":"Work","color":"green"}]}'::jsonb WHERE table_slug = 'forms' AND key = 'style'`);
+    const group = (await db.pool.query("SELECT group_id FROM boss_groups WHERE section_slug = 'forms' LIMIT 1")).rows[0].group_id;
+    const rec = (code: string, data: Record<string, unknown>) => db.pool.query(`INSERT INTO boss_records (section_slug, record_id, group_id, position, data) VALUES ('forms', $1, $2, 900, $3::jsonb)`, [`old-${code}`, group, JSON.stringify({ id: `old-${code}`, code, ...data })]);
+    await rec("OV", { slug: "ov", title: "Old voucher form", style: "Work", category: "Vouchers" });
+    await rec("OW", { slug: "ow", title: "Old work form", style: "Work", category: "Work" });
+    await rec("OB", { slug: "ob", title: "Old blank style", category: "Work" });
+    const view = (await bundle("forms")).views.find((v) => v.config.key === "vouchers")!;
+    await db.pool.query(`UPDATE boss_views SET config = replace(config::text, '"style"', '"category"')::jsonb WHERE id = $1`, [view.id]);
+    await db.pool.query("DELETE FROM boss_migrations WHERE id = 'v4:forms-style-work-vouchers'");
+
+    const report = await applyBaseMigrations(db.pool);
+    assert.ok(report.backfills.some((x) => x.id === "v4:forms-style-work-vouchers"));
+    const b = await bundle("forms");
+    assert.ok(!b.fields.some((f) => f.key === "category"), "Category column removed");
+    assert.deepEqual(b.fields.find((f) => f.key === "style")!.options.choices!.map((c) => c.name), ["Work", "Vouchers"]);
+    const by = (code: string) => b.records.find((r) => r.code === code)!;
+    assert.equal(by("OV").style, "Vouchers", "a form that was Vouchers keeps it");
+    assert.equal(by("OW").style, "Work");
+    assert.equal(by("OB").style, "Work", "a blank style became Work");
+    assert.equal(by("OV").category, "Vouchers", "the old value is kept in the record, never deleted");
+    assert.equal(b.views.find((v) => v.id === view.id)!.config.filters[0].field, "style", "views now filter on Style");
+    assert.deepEqual((await applyBaseMigrations(db.pool)).backfills, [], "running it again changes nothing");
   });
 
   it("the migration reports no warnings on a fresh database and creates the code indexes", async () => {

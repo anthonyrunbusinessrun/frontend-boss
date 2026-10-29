@@ -27,7 +27,7 @@ sh qa/restart-app.sh                              # starts the production build 
 BOSS_URL=http://localhost:3100 python3 qa/base-e2e.py          # tables, views, sidebar, records, sections
 # optional second instance to test server-side filtering with a tiny page size:
 BOSS_SERVER_QUERY_THRESHOLD=5 BOSS_SERVER_PAGE=6 npx next start -p 3101 &
-BOSS_URL=http://localhost:3100 BOSS_URL_SERVER=http://localhost:3101 python3 qa/e2e-update2.py   # create menu, codes, PDFs, form categories, filters
+BOSS_URL=http://localhost:3100 BOSS_URL_SERVER=http://localhost:3101 python3 qa/e2e-update2.py   # create menu, codes, voucher PDF, Forms style, filters
 ```
 
 The older `qa/interact.py`, `qa/e2e-browser.mjs` and the screenshot-diff scripts target the previous
@@ -179,7 +179,7 @@ details, voucher details) is added to **fresh databases only**.
 | `src/lib/base/base.test.ts` | filters, sorting, grouping, search, computed fields, validation, view defaults, sidebar move / reorder logic |
 | `src/server/base/api.test.ts` | real PostgreSQL: migrations, CRUD, validation, uniqueness, link integrity, permissions, layout, favorites, forms, uploads |
 | `src/lib/base/features.test.ts`, `timeScale.test.ts` | sequence rules, voucher helpers, filter operators, timeline maths |
-| `src/server/base/features.test.ts` | real PostgreSQL: automatic codes (incl. 12 parallel creates), form categories, the fixed voucher PDF and removal of PDF generation, server filtering parity with the browser |
+| `src/server/base/features.test.ts` | real PostgreSQL: automatic codes (incl. 12 parallel creates), Forms Style (Work / Vouchers), the fixed voucher PDF and removal of PDF generation, server filtering parity with the browser |
 | original suites | AIS accounting logic, table state, record forms |
 | `qa/e2e-update2.py` | browser: Create menu, automatic Code, the fixed voucher PDF (shown for every row, download, nothing generated), form categories, filtering in every view type, server-side filtering |
 | `qa/base-e2e.py` | browser: navigation, all view types, create / rename / duplicate / delete, sections and drag-and-drop, favorites, inline editing, fields, forms, Team Profile, Folio, Voucher, Items, Capabilities |

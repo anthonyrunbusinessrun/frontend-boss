@@ -114,8 +114,11 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
   They are ordinary fields; nothing fills the PDF from them. Types: FD = Freight Delivery Confirmation (the supplied PDF), BL = Bill of Lading.
 - The preview shows up to 8 pages.
 
-**Forms category.** Work / Vouchers exists on form records (Forms table) and on Form *views* (builder, create dialog, sidebar tag).
-Existing forms and form views were set to Work.
+**Forms table: Style (Work / Vouchers).** The Forms table has no Category column. Its **Style** column is a dropdown with two choices,
+**Work** and **Vouchers** (new forms default to Work), chosen when creating or editing a form (drawer or grid cell). "All Forms" is grouped by Style
+and there are “Work forms” and “Voucher forms” views. Existing forms were all Work and stay Work; a form that had been marked Vouchers in the earlier
+Category column keeps it as its Style (the old value stays in the record, it is only no longer shown). The separate **Form view** (the view type)
+still has its own Work / Vouchers category in its builder and create dialog and a tag in the sidebar; say if you want that removed too.
 
 **Filtering.**
 - Not built from the reference: “Describe how to filter this view” (an AI feature) and “Add condition group” (nested groups). Conditions are one list joined by and / or, evaluated left to right.

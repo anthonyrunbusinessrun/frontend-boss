@@ -234,38 +234,46 @@ with sync_playwright() as p:
         assert int(re.search(r"A-(\d+)", saved.inner_text()).group(1)) > int(shown[2:]) or True
     check("Code: if the shown number was taken meanwhile, the server assigns the next and says so", code_stale_preview)
 
-    # ====================================================================== 3. Forms category
+    # ====================================================================== 3. Forms: Style is Work or Vouchers
     go("/forms")
-    def forms_category():
+    def forms_style():
         view("All Forms")
+        heads = [h.inner_text().strip() for h in page.get_by_role("columnheader").all()]
+        assert "Category" not in heads and "Style" in heads, heads
         page.get_by_role("button", name="New form").click()
         d = page.get_by_role("dialog")
-        sel = d.get_by_label("Category")
+        assert d.get_by_label("Category").count() == 0, "no Category input"
+        sel = d.get_by_label("Style")
         assert [o.inner_text() for o in sel.locator("option").all() if o.get_attribute("value")] == ["Work", "Vouchers"]
-        assert sel.input_value() == "Work", "default category"
+        assert sel.input_value() == "Work", "default Work"
         d.get_by_label("Code").fill(f"U{RUN[-3:]}"); d.get_by_label("Slug").fill(f"u2-form-{RUN}"); d.get_by_label(re.compile(r"^Title( \*)?$")).fill(f"U2 Voucher Form {RUN}")
         sel.select_option("Vouchers"); d.get_by_role("button", name="Create form").click()
         dd = page.get_by_role("dialog").last; expect(dd.get_by_role("button", name="Edit")).to_be_visible()
-        assert "Vouchers" in dd.inner_text(), "the category is shown when viewing"
+        assert "Vouchers" in dd.inner_text(), "the style is shown when viewing"
         page.keyboard.press("Escape"); page.wait_for_timeout(400)
-    check("Forms: a Work / Vouchers dropdown when creating a form, defaulting to Work; saved and shown", forms_category)
+    check("Forms: no Category column; the Style dropdown offers Work and Vouchers (default Work) and is saved", forms_style)
 
     def forms_organized():
         view("Voucher forms"); expect(rows().filter(has_text=f"U2 Voucher Form {RUN}")).to_have_count(1)
         view("Work forms"); expect(rows().filter(has_text=f"U2 Voucher Form {RUN}")).to_have_count(0)
-        assert rows().filter(has_text="Job Card").count() == 1, "existing forms were assigned Work"
-        view("All Forms"); assert page.get_by_role("button", name=re.compile("^Category")).count() >= 1
-        assert "Vouchers" in page.get_by_role("grid").inner_text() and "Work" in page.get_by_role("grid").inner_text()
-    check("Forms: grouped / filtered by category; new and existing forms land in the right one", forms_organized)
+        assert rows().filter(has_text="Job Card").count() == 1, "existing forms keep Work"
+        view("All Forms")
+        txt = page.get_by_role("grid").inner_text(); assert "Vouchers" in txt and "Work" in txt
+    check("Forms: grouped and filtered by Style; new and existing forms land in the right place", forms_organized)
 
-    def forms_change_category():
+    def forms_change_style():
         view("All Forms")
         rows().filter(has_text=f"U2 Voucher Form {RUN}").get_by_role("button", name=re.compile("^Open record")).click()
         d = page.get_by_role("dialog").last; d.get_by_role("button", name="Edit").click()
-        d.get_by_label("Category").select_option("Work"); d.get_by_role("button", name="Save changes").click()
+        assert [o.inner_text() for o in d.get_by_label("Style").locator("option").all() if o.get_attribute("value")] == ["Work", "Vouchers"]
+        d.get_by_label("Style").select_option("Work"); d.get_by_role("button", name="Save changes").click()
         expect(d.get_by_role("button", name="Edit")).to_be_visible(); page.keyboard.press("Escape"); page.wait_for_timeout(400)
         view("Work forms"); expect(rows().filter(has_text=f"U2 Voucher Form {RUN}")).to_have_count(1)
-    check("Forms: the category can be changed and the form moves", forms_change_category)
+        # and back, inline in the grid
+        cell = rows().filter(has_text=f"U2 Voucher Form {RUN}").get_by_role("gridcell").nth(5)
+        cell.dblclick(); cell.locator("select").select_option("Vouchers"); cell.get_by_role("button", name="Save").click(); page.wait_for_timeout(600)
+        view("Voucher forms"); expect(rows().filter(has_text=f"U2 Voucher Form {RUN}")).to_have_count(1)
+    check("Forms: Style can be changed to Work or Vouchers when editing (drawer and grid cell)", forms_change_style)
 
     def form_view_category():
         go("/profiles")

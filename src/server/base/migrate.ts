@@ -251,6 +251,48 @@ async function ensureSequenceIndexes(client: PoolClient, report: MigrationReport
   }
 }
 
+/**
+ * Forms: the “Category” column is replaced by the “Style” column, which now offers Work and Vouchers.
+ * Nothing is deleted from records: a form marked Vouchers in the old column keeps that choice as its Style.
+ */
+async function backfillsV4(client: PoolClient, report: MigrationReport) {
+  const hasForms = (await client.query("SELECT 1 FROM boss_sections WHERE slug = 'forms'")).rowCount;
+  if (!hasForms) return;
+  await once(
+    client,
+    "v4:forms-style-work-vouchers",
+    async () => {
+      // 1. Style offers Work and Vouchers (the choices of an existing field are only extended, never replaced).
+      const style = await client.query<{ options: { choices?: Array<{ id: string; name: string; color: string }>; defaultValue?: string } }>("SELECT options FROM boss_fields WHERE table_slug = 'forms' AND key = 'style'");
+      if (style.rowCount) {
+        const options = style.rows[0].options;
+        const choices = options.choices ?? [];
+        if (!choices.some((c) => c.name === "Work")) choices.push({ id: "ch_work", name: "Work", color: "green" });
+        if (!choices.some((c) => c.name === "Vouchers")) choices.push({ id: "ch_vouchers", name: "Vouchers", color: "orange" });
+        await client.query("UPDATE boss_fields SET options = $1::jsonb, updated_at = NOW() WHERE table_slug = 'forms' AND key = 'style'", [JSON.stringify({ ...options, choices, defaultValue: options.defaultValue ?? "Work" })]);
+      }
+      // 2. A form that was marked Vouchers in the old Category column keeps it as its Style.
+      const moved = await client.query(`UPDATE boss_records SET data = data || '{"style":"Vouchers"}'::jsonb, updated_at = NOW() WHERE section_slug = 'forms' AND data->>'category' = 'Vouchers'`);
+      // 3. Forms without a style are Work forms.
+      const blank = await client.query(`UPDATE boss_records SET data = data || '{"style":"Work"}'::jsonb, updated_at = NOW() WHERE section_slug = 'forms' AND COALESCE(data->>'style', '') = ''`);
+      // 4. The Category field goes; views that used it (grouping, filters) now use Style.
+      const gone = await client.query("DELETE FROM boss_fields WHERE table_slug = 'forms' AND key = 'category'");
+      const views = await client.query<{ id: string; config: Record<string, unknown> }>("SELECT id, config FROM boss_views WHERE table_slug = 'forms'");
+      let rewritten = 0;
+      for (const v of views.rows) {
+        const text = JSON.stringify(v.config);
+        const next = text.replace(/("field":)"category"/g, '$1"style"');
+        if (next !== text) {
+          await client.query("UPDATE boss_views SET config = $2::jsonb, updated_at = NOW() WHERE id = $1", [v.id, next]);
+          rewritten += 1;
+        }
+      }
+      return `${moved.rowCount} forms moved to style Vouchers, ${blank.rowCount} blank styles set to Work, ${gone.rowCount} Category field removed, ${rewritten} views now use Style`;
+    },
+    report,
+  );
+}
+
 async function backfillsV3(client: PoolClient, report: MigrationReport) {
   // Voucher PDFs are no longer created, uploaded or replaced by the app: every voucher shows the supplied Voucher.pdf.
   // The three PDF fields from the previous release are removed from the field list. Values already stored in records
@@ -270,21 +312,16 @@ async function backfillsV2(client: PoolClient, report: MigrationReport) {
   const has = async (slug: string) => (await client.query("SELECT 1 FROM boss_sections WHERE slug = $1", [slug])).rowCount;
 
   if (await has("forms")) {
-    // Existing forms were all “Work” forms (the only style they had).
+    // Form views (the view type) have a category of their own; give existing ones the default.
     await once(
       client,
       "v2:forms-category-work",
       async () => {
-        const r = await client.query(
-          `UPDATE boss_records SET data = data || '{"category":"Work"}'::jsonb, updated_at = NOW()
-           WHERE section_slug = 'forms' AND (NOT data ? 'category' OR data->>'category' IS NULL OR data->>'category' = '')`,
-        );
-        // Form views (the view type) get the same default category so none is left without one.
         const v = await client.query(
           `UPDATE boss_views SET config = jsonb_set(config, '{form,category}', '"Work"'::jsonb), updated_at = NOW()
            WHERE type = 'form' AND config ? 'form' AND NOT (config->'form' ? 'category')`,
         );
-        return `${r.rowCount} forms and ${v.rowCount} form views set to category Work`;
+        return `${v.rowCount} form views set to category Work`;
       },
       report,
     );
@@ -403,6 +440,7 @@ export async function applyBaseMigrations(pool: Pool, opts: { freshSeed?: boolea
     await applyLateViews(client, report);
     await backfillsV2(client, report);
     await backfillsV3(client, report);
+    await backfillsV4(client, report);
     await ensureSequenceIndexes(client, report);
     // Autonumber counters for every table (fields added by an operator later get one on first use).
     for (const seed of TABLES) {
