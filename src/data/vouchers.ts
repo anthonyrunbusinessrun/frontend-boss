@@ -1,18 +1,45 @@
 import type { RecordSet, VoucherRow } from "@/types";
+import { FEMA_VOUCHERS } from "./femaVouchers";
 
-// Transcribed from Screens/08-boss-vouchers.png.
-// NEEDS CLARIFICATION: Cover images are clipped at the frame edge; only slivers exist as assets.
+/** FEMA vouchers from FEMA_Vouchers.xlsx (16 rows). */
 export const vouchers: RecordSet<VoucherRow> = {
-  range: { from: 1, to: 2, total: 2 },
+  range: { from: 1, to: FEMA_VOUCHERS.length, total: FEMA_VOUCHERS.length },
   groups: [
     {
       id: "active",
       label: "ACTIVE VOUCHERS",
-      count: 2,
-      rows: [
-        { id: "v1", voucherId: "R-IN-1033", sp: 45, svc: "SVC-9", debit: 1250, credit: 0, balance: 1250, scans: 12, prefix: "R-IN", label: "RETAIL_PROMO", ref: "#033", sum: 1250, cover: "/assets/vouchers/cover-1.png" },
-        { id: "v2", voucherId: "R-IN-1034", sp: 20, svc: "SVC-2", debit: 450, credit: 450, balance: 0, scans: 3, prefix: "R-IN", label: "CASHBACK", ref: "#034", sum: 450, cover: "/assets/vouchers/cover-2.png" },
-      ],
+      count: FEMA_VOUCHERS.length,
+      rows: FEMA_VOUCHERS.map((row) => ({
+        id: row.id,
+        i: row.i,
+        accrualDate: row.accrualDate,
+        docType: row.docType,
+        headline: row.headline,
+        docStatus: row.docStatus,
+        by: row.by,
+        vendorCode: row.vendorCode,
+        contractNo: row.contractNo,
+        operatorCode: row.operatorCode,
+        reference2: row.reference2,
+        deliverVia: row.deliverVia,
+        resource: row.resource,
+        tracking: row.tracking,
+        vsf: row.vsf,
+        manifest: row.manifest,
+        voucherNote: row.voucherNote,
+        // Legacy ledger placeholders (hidden in the FEMA grid). Scans left empty to match the sheet.
+        voucherId: `LLG-${row.docType}-${row.i + 4000}`,
+        sp: 0,
+        svc: "",
+        debit: 0,
+        credit: 0,
+        balance: 0,
+        prefix: `LLG-${row.docType}`,
+        label: row.headline,
+        ref: `#${String(row.i).slice(-3)}`,
+        sum: 0,
+        cover: "",
+      })),
     },
   ],
 };
@@ -20,7 +47,8 @@ export const vouchers: RecordSet<VoucherRow> = {
 export const voucherLegend = {
   title: "VOUCHERS LEGEND & SYSTEM NOTES",
   entries: [
-    { term: "Debit / Credit Rules:", text: "Amounts auto-calculate the final current Balance value depending on prefix classification schemas (e.g. Cashback vs Promo credits)." },
+    { term: "Form:", text: "FD = Freight Delivery Confirmation, FT = In Transit ASN, BL = Bill of Lading, FQ = Freight RFQ, IN = Invoice." },
+    { term: "Voucher number:", text: "LLG- + Form + (ID + 4000). Example: ID 11574 with Form FD is LLG-FD-15574." },
     { term: "Scan Tracker:", text: "Track total API validations and physical QR code scanning events mapped through systemic client profiles." },
   ],
 };

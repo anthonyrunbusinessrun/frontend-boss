@@ -15,12 +15,15 @@ export const VOUCHER_LETTERHEAD = {
   numberOffset: 4000,
 };
 
-export type VoucherDocType = "FD" | "BL";
+export type VoucherDocType = "FD" | "FT" | "BL" | "FQ" | "IN";
 
-/** Wording and marks that depend on the document type. */
+/** Wording and marks that depend on the document type (Form column in FEMA_Vouchers.xlsx). */
 export const VOUCHER_TYPES: Record<VoucherDocType, { title: string; defaultHeadline: string; mark: string; label: string }> = {
-  FD: { title: "Freight Delivery Confirmation", defaultHeadline: "FREIGHT DELIVERY", mark: "L", label: "Freight Delivery Confirmation" },
+  FD: { title: "Freight Delivery Confirmation", defaultHeadline: "ASN - DELIVERED", mark: "L", label: "Freight Delivery Confirmation" },
+  FT: { title: "Freight In Transit", defaultHeadline: "ASN - IN TRANSIT", mark: "L", label: "ASN In Transit" },
   BL: { title: "Original | Non Negotiable", defaultHeadline: "BILL OF LADING", mark: "R", label: "Bill of Lading" },
+  FQ: { title: "Freight RFQ", defaultHeadline: "FREIGHT RFQ", mark: "Q", label: "Freight RFQ" },
+  IN: { title: "Invoice", defaultHeadline: "INVOICE", mark: "I", label: "Invoice" },
 };
 
 export const MANIFEST_COLUMNS = ["CLIN", "Title", "Description", "Delivery", "Freight #"] as const;
@@ -47,7 +50,9 @@ export function parseRows(text: unknown, columns: number): string[][] {
 export const joinRows = (rows: string[][]) => rows.map((r) => r.join(" | ")).join("\n");
 
 export function docTypeOf(record: RecordRow): VoucherDocType {
-  return record.docType === "FD" ? "FD" : "BL";
+  const t = record.docType;
+  if (t === "FD" || t === "FT" || t === "BL" || t === "FQ" || t === "IN") return t;
+  return "BL";
 }
 
 export function voucherNumber(record: RecordRow): string {
