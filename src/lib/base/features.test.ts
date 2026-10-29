@@ -6,7 +6,7 @@ import { activeFilterCount, applyFilters, defaultRule, describeRule, isIncomplet
 import { formatCode, isValidPrefix, nextFromMax, nextNumber, parseCode } from "./sequence";
 import type { FieldDef, FilterRule, RecordRow } from "./types";
 import { validateRecordInput } from "./validate";
-import { MANIFEST_COLUMNS, PACK_COLUMNS, VOUCHER_DOCUMENT, formatVoucherDate, joinRows, parseRows, voucherNumber } from "./voucher";
+import { MANIFEST_COLUMNS, PACK_COLUMNS, formatVoucherDate, joinRows, parseRows, voucherNumber } from "./voucher";
 
 const f = (key: string, type: FieldDef["type"], extra: Partial<FieldDef> = {}): FieldDef => ({ key, name: key, type, options: {}, position: 0, required: false, primary: false, ...extra });
 const rule = (field: string, op: FilterRule["op"], extra: Partial<FilterRule> = {}): FilterRule => ({ id: field + op, join: "and", field, op, ...extra });
@@ -68,10 +68,6 @@ describe("voucher document helpers", () => {
     assert.equal(computedVoucherNo({ number: "i", type: "docType", prefix: "LLG-", offset: 4000 }, { id: "x", i: 11574, docType: "FD" }), "LLG-FD-15574");
   });
 
-  it("always points at the one supplied voucher PDF", () => {
-    assert.deepEqual(VOUCHER_DOCUMENT, { url: "/vouchers/Voucher.pdf", name: "Voucher.pdf" });
-  });
-
   it("formats dates as printed on the voucher", () => {
     assert.equal(formatVoucherDate("2026-07-09"), "7/9/2026");
     assert.equal(formatVoucherDate("nope"), "");
@@ -83,7 +79,7 @@ describe("voucher document helpers", () => {
     assert.deepEqual(rows[1], ["X", "Y", "", "", ""]);
     assert.deepEqual(parseRows("a | b | c | d", 3)[0], ["a", "b", "c | d"], "extra cells fold into the last column");
     assert.deepEqual(parseRows(undefined, 3), []);
-    assert.equal(parseRows("1|2|3|4|5|6", PACK_COLUMNS.length)[0].length, 6);
+    assert.equal(parseRows("1|2|3|4|5|6", PACK_COLUMNS.length)[0].length, 5);
     assert.equal(joinRows([["a", "b"], ["c", "d"]]), "a | b\nc | d");
   });
 });

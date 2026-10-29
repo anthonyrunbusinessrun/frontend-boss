@@ -87,3 +87,12 @@ the voucher PDF is displayed with pdf.js (up to 8 pages), not the browser-native
 
 ## Fix included in this version
 API routes for records, fields and sections now match only their exact path. Previously a stray suffix such as `DELETE /records/:id/anything` was treated as a plain record delete.
+
+# Update 4: dynamic voucher document
+
+- The Vouchers side panel draws the selected voucher on the supplied template (`public/vouchers/template/Voucher_Template.png` / `.pdf`), in the sample PDFs' fonts, and redraws whenever another row is selected or a voucher is edited. Full-size view with Print.
+- New: `src/lib/base/voucherDocument.ts` (what is printed, from a row), `src/data/voucherDirectory.ts` (reference text from the sample PDFs), `src/components/base/vouchers/{VoucherDocument.tsx,voucherLayout.ts}`, `qa/voucher-harness/*`, `qa/fake-auth.mjs` + `qa/start-e2e-stack.sh` (local browser tests behind the sign-in).
+- Removed: the fixed `Voucher.pdf`, its pdf.js viewer and the `pdfjs-dist` dependency. Added fonts: `@fontsource/saira`, `saira-condensed`, `saira-extra-condensed`, `saira-semi-condensed`.
+- Pack Details help text: five columns (the template's pack table has no Destination column).
+- Fixed: the document's text-fit measurement is identical on server and first browser render (no hydration error).
+- The favorites browser test now reflects the signed-in-account model of the authentication update.

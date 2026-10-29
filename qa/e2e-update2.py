@@ -13,8 +13,12 @@ from playwright.sync_api import sync_playwright, expect
 BASE = os.environ.get("BOSS_URL", "http://localhost:3100")
 SERVER_BASE = os.environ.get("BOSS_URL_SERVER")
 CHROME = os.environ.get("CHROME_PATH", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
-SAMPLE_PDF = os.environ.get("SAMPLE_PDF", os.path.join(os.path.dirname(__file__), "..", "public", "vouchers", "Voucher.pdf"))
 RUN = str(int(time.time()))[-6:]
+
+def sign_in(context, base):
+    """Sign in through the app's own login route (the local fake Auth server accepts this one test user)."""
+    r = context.request.post(base + "/api/auth/login", data={"email": os.environ.get("BOSS_E2E_EMAIL", "admin@example.test"), "password": os.environ.get("BOSS_E2E_PASSWORD", "local-test-password")}, headers={"origin": base})
+    assert r.ok, f"sign-in failed: {r.status} {r.text()[:120]}"
 results, console_errors = [], []
 
 def cleanup():
@@ -90,12 +94,12 @@ def pills(): return page.get_by_role("status", name="Active filters")
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"])
     ctx = browser.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
+    sign_in(ctx, BASE)
     page = ctx.new_page()
     page.on("console", lambda m: console_errors.append(m.text[:200]) if m.type == "error" else None)
     page.on("pageerror", lambda e: console_errors.append("PAGEERROR " + page.url + " " + str(e)[:140]))
     page.set_default_timeout(8000)
     os.makedirs("/tmp/shots", exist_ok=True)
-    pdf_bytes = open(SAMPLE_PDF, "rb").read()
 
     # ====================================================================== 1. Create menu
     go("/actions")
@@ -293,63 +297,86 @@ with sync_playwright() as p:
         sidebar().get_by_role("button", name=re.compile(r"^New Team Onboarding Form")).click(); expect(page.get_by_role("button", name="Submit")).to_be_visible()
     check("Forms: Form views have their own category (separate from view type); existing form views keep working", form_view_category)
 
-    # ====================================================================== 4. Voucher PDF (one supplied document)
+    # ====================================================================== 4. Voucher document (template + the row's fields)
     go("/vouchers"); view("VOUCHERS | Simplified")
     panel = lambda: page.get_by_role("complementary", name="Voucher tools")
-    def ready(): expect(panel().locator("[data-testid=pdf-preview][data-state=ready]")).to_be_visible(timeout=15000)
-    SIG = "c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0, ink = 0; for (let i = 0; i < d.length; i += 52) { h = (h * 31 + d[i]) >>> 0; if (d[i] < 120) ink++; } return [h, ink, c.width, c.height]; }"
-    def pdf_shown():
-        ready(); assert panel().locator("[data-testid=pdf-preview] canvas").count() >= 1
-        assert "Voucher.pdf" in panel().inner_text()
-        h, ink, w, hgt = panel().locator("canvas").first.evaluate(SIG)
-        assert ink > 300, "the preview has drawn the document"
-        sigs["first"] = (h, ink, w, hgt)
-    sigs = {}
-    check("Vouchers: the supplied Voucher.pdf is displayed in the app", pdf_shown)
+    doc = lambda: panel().get_by_test_id("voucher-document")
+    def field(name): return doc().locator(f"[data-field='{name}']")
+    def doc_ready(): expect(panel().locator("[data-testid=voucher-document][data-ready=true]")).to_be_visible(timeout=15000)
+    def texts(prefix): return [t.strip() for t in doc().locator(f"[data-field^='{prefix}']").all_text_contents()]
+    def click_row(code): rows().filter(has_text=code).first.get_by_role("gridcell").nth(2).click()
 
-    def pdf_same_for_every_row():
-        sel = panel().get_by_label("Voucher", exact=True)
-        options = sel.locator("option").all()
-        assert len(options) >= 2
-        # a third voucher, created just now, must show the very same document
-        api("POST", "tables/vouchers/records", {"docType": "BL", "headline": "BILL OF LADING", "deliverVia": "Another carrier"})
-        page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]"); ready()
-        sel = panel().get_by_label("Voucher", exact=True)
-        n = sel.locator("option").count(); assert n >= 3, n
-        for i in range(n):
-            sel.select_option(index=i); page.wait_for_timeout(500); ready()
-            assert panel().locator("canvas").count() >= 1
-            assert tuple(panel().locator("canvas").first.evaluate(SIG)) == tuple(sigs["first"]), f"row {i} shows a different document"
-            assert "Voucher.pdf" in panel().inner_text()
-    check("Vouchers: every voucher row shows the same supplied PDF", pdf_same_for_every_row)
+    def doc_template_and_first_row():
+        doc_ready()
+        r = page.request.get(BASE + "/vouchers/template/Voucher_Template.png"); assert r.status == 200 and r.body()[:4] == b"\x89PNG"
+        assert doc().locator("image").first.get_attribute("href") == "/vouchers/template/Voucher_Template.png"
+        assert page.evaluate("() => new Promise(res => { const i = new Image(); i.onload = () => res([i.naturalWidth, i.naturalHeight]); i.onerror = () => res(null); i.src = '/vouchers/template/Voucher_Template.png'; })") == [2550, 3300]
+        assert field("number").text_content() == "LLG-FD-15574" and field("accrual").text_content() == "7/9/2026"
+        assert field("topTitle").text_content() == "Freight Delivery Confirmation" and field("barText").text_content() == "ASN - DELIVERED"
+        assert field("leftLabel").text_content() == "VENDOR ACCOUNT" and field("rightLabel").text_content() == "OPERATED BY"
+        assert field("markLetter").text_content() == "L" and field("markCode").text_content() == "FD" and field("status").text_content() == "Issued"
+        assert field("issuedCode").text_content() == "FEMA-HQ" and field("performCode").text_content() == "DC-GRC"
+        assert texts("leftLine") == ["Federal Emergency Management Agency", "500 C Street SW", "Washington, DC 20472"]
+        assert texts("rightLine")[0] == "FEMA DC Greencastle" and len(texts("rightLine")) == 4
+        assert field("ref1").text_content() == "70FB7026F00000036" and field("ref2").text_content() == "70FB7026F00000036"
+        assert texts("via") == ["SAIA LTL Freight", "(609) 807-9228", "800-456-7296"]
+        assert field("resource").text_content() == "LTL EXPRESS" and field("tracking").text_content() == "5188241"
+        assert "I/T-015 · GREENCASTLE · Wipes" in texts("manifest-0")
+        assert texts("terms")[0].startswith("Carrier accepts full responsibility")
+        assert doc().locator("[data-field=qr]").count() == 1, "a QR code is drawn"
+    check("Voucher document: the template, filled from the first voucher's columns", doc_template_and_first_row)
 
-    def pdf_download_unchanged():
-        link = panel().get_by_role("link", name="Download voucher PDF"); assert link.get_attribute("href") == "/vouchers/Voucher.pdf"
-        with page.expect_download() as dl: link.click()
-        assert dl.value.suggested_filename == "Voucher.pdf"
-        assert sha(open(dl.value.path(), "rb").read()) == sha(pdf_bytes), "the download is the supplied file, byte for byte"
-        r = page.request.get(BASE + "/vouchers/Voucher.pdf"); assert r.status == 200 and r.body()[:5] == b"%PDF-" and sha(r.body()) == sha(pdf_bytes)
-        assert panel().get_by_role("link", name="Open voucher PDF in a new tab").get_attribute("target") == "_blank"
-    check("Vouchers: open and download give back the supplied PDF unchanged", pdf_download_unchanged)
+    def doc_follows_selected_row():
+        expected = {"LLG-FT-15575": ("ASN - IN TRANSIT", "CONTRACTED TO", "FT"), "LLG-BL-15578": ("BILL OF LADING", "CONSIGNEE", "BL"), "LLG-FQ-15579": ("FREIGHT RFQ", "QUOTE FROM", "FQ"), "LLG-IN-15595": ("INVOICE", "BILL TO", "IN")}
+        for code, (bar, label, form) in expected.items():
+            click_row(code)
+            expect(doc()).to_have_attribute("data-number", code); page.wait_for_timeout(200)
+            assert field("barText").text_content() == bar and field("leftLabel").text_content() == label and field("markCode").text_content() == form, code
+            assert panel().get_by_label("Voucher", exact=True).evaluate("e => e.options[e.selectedIndex].text") == code
+    check("Voucher document: clicking a row in the table redraws the document for that voucher", doc_follows_selected_row)
 
-    def pdf_nothing_generated():
+    def doc_details_per_form():
+        click_row("LLG-BL-15578"); expect(doc()).to_have_attribute("data-number", "LLG-BL-15578")
+        assert field("topTitle").text_content() == "Original | Non Negotiable" and field("markLetter").text_content() == "R"
+        assert texts("leftLine")[0] == "Land Logistics" and texts("rightLine")[0] == "Land Logistics" and field("ref2").text_content() == "37702097"
+        assert texts("via") == ["Total Quality Logistics", "(513) 831-2600"]
+        assert texts("manifest-0") == ["P/U - EMERALD PRODUCTS"] and field("note-0").text_content() == "Total Quality Logistics (TQL)"
+        click_row("LLG-FQ-15579"); expect(doc()).to_have_attribute("data-number", "LLG-FQ-15579")
+        assert field("status").text_content() == "Planned" and texts("via") == ["VIA FREE ENTRY"] * 3 and field("ref1").text_content() == "Airline Sales Order:"
+        assert field("note-0").text_content() == "Company: ABC Company"
+        click_row("LLG-IN-15595"); expect(doc()).to_have_attribute("data-number", "LLG-IN-15595")
+        assert len(texts("rightLine")) == 5 and field("topTitle").text_content() == "Request for Payment" and texts("terms")[0].startswith("Payment is due")
+        fill = doc().locator("[data-field=status] rect").get_attribute("fill"); assert fill == "#c4ecff", fill
+    check("Voucher document: wording, parties, carrier, notes, terms and pill follow each Form and row", doc_details_per_form)
+
+    def doc_follows_edits():
+        rows().filter(has_text="LLG-BL-15580").first.get_by_role("button", name=re.compile("^Open record")).click()
+        d = page.get_by_role("dialog").last; d.get_by_role("button", name="Edit").click()
+        d.get_by_label("Tracking #").fill("E2E-TRACK-" + RUN); d.get_by_label("Terms of Trade").fill("Pay on delivery.\n\nThank you."); d.get_by_label("Operated By").fill("My Depot\n9 Test Road")
+        d.get_by_role("button", name="Save changes").click(); expect(d.get_by_role("button", name="Edit")).to_be_visible(); page.wait_for_timeout(400)
+        expect(doc()).to_have_attribute("data-number", "LLG-BL-15580")
+        assert field("tracking").text_content() == "E2E-TRACK-" + RUN and texts("terms") == ["Pay on delivery.", "Thank you."] and texts("rightLine") == ["My Depot", "9 Test Road"]
+        page.keyboard.press("Escape"); page.wait_for_timeout(300)
+    check("Voucher document: edits to a voucher (and its optional detail columns) show immediately", doc_follows_edits)
+
+    def doc_full_size_and_print():
+        panel().get_by_role("button", name="Full size").click(); d = page.get_by_role("dialog")
+        expect(d.get_by_test_id("voucher-document")).to_be_visible(); assert d.get_by_test_id("voucher-document").get_attribute("data-number")
+        assert d.get_by_test_id("voucher-document").bounding_box()["width"] > 700, "readable at full size"
+        assert d.get_by_role("button", name="Print").count() == 1
+        css = page.evaluate("() => [...document.styleSheets].flatMap(s => { try { return [...s.cssRules] } catch { return [] } }).filter(r => r.type === CSSRule.MEDIA_RULE && r.conditionText === 'print').map(r => r.cssText).join(' ')")
+        assert "data-voucher-print" in css, "a print rule shows only the document"
+        d.get_by_role("button", name="Close").click(); expect(page.get_by_role("dialog")).to_have_count(0)
+    check("Voucher document: full-size view with Print", doc_full_size_and_print)
+
+    def doc_nothing_generated():
         txt = panel().inner_text().lower()
-        for banned in ["generate pdf", "regenerate", "upload pdf", "replace", "generated pdf", "original pdf"]:
-            assert banned not in txt, banned
-        assert panel().get_by_role("button", name=re.compile(r"^(Generate PDF|Regenerate|Upload PDF|Replace)", re.I)).count() == 0
+        for banned in ["generate pdf", "regenerate", "upload pdf", "replace", "generated pdf"]: assert banned not in txt, banned
         page.get_by_role("button", name="New voucher").click(); d = page.get_by_role("dialog")
         for label in ["Original PDF", "Generated PDF"]: assert d.get_by_label(label).count() == 0, label
-        assert d.locator("input[type=file]").count() == d.locator("input[type=file][accept^='image']").count(), "the only file fields take images (QR, cover), never PDFs"
         d.get_by_role("button", name="Cancel").click()
-        view("Voucher Details"); heads = " ".join(h.inner_text() for h in page.get_by_role("columnheader").all())
-        assert "Original PDF" not in heads and "Generated PDF" not in heads
-    check("Vouchers: no PDF is generated, uploaded or replaced anywhere", pdf_nothing_generated)
-
-    def pdf_api_gone():
-        v = api("GET", "tables/vouchers")["records"][0]
-        r = page.request.post(BASE + f"/api/base/tables/vouchers/records/{v['id']}/generate-pdf", headers={"sec-fetch-site": "same-origin"})
-        assert r.status in (404, 405), r.status
-    check("Vouchers: the PDF generation endpoint no longer exists", pdf_api_gone)
+        r = page.request.post(BASE + "/api/base/tables/vouchers/records/x/generate-pdf", headers={"origin": BASE}); assert r.status in (404, 405), r.status
+    check("Voucher document: no PDF is generated, uploaded or replaced anywhere", doc_nothing_generated)
 
     # ====================================================================== 5. Filtering
     go("/actions"); view("All Actions")

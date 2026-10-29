@@ -20,7 +20,7 @@ let call: ReturnType<typeof makeCaller>;
 
 const sha = (b: Uint8Array | Buffer) => createHash("sha256").update(b).digest("hex");
 const bundle = async (t: string) => (await call("GET", `tables/${t}`)).json as TableBundle;
-const SUPPLIED_PDF = path.join(process.cwd(), "public/vouchers/Voucher.pdf");
+const TEMPLATE_DIR = path.join(process.cwd(), "public/vouchers/template");
 const newAction = (extra: Record<string, unknown> = {}) => call("POST", "tables/actions/records", { accrue: "2026-11-01", title: "Seq test", type: "Notice", status: "Queue", ...extra });
 
 describe("automatic codes, form categories, voucher PDFs and server filtering", { skip }, () => {
@@ -156,12 +156,15 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     });
   });
 
-  describe("Voucher PDF", () => {
-    it("the app serves exactly the supplied PDF, and it is a real PDF", async () => {
-      const bytes = await fs.readFile(SUPPLIED_PDF);
-      assert.equal(bytes.subarray(0, 5).toString("ascii"), "%PDF-");
-      assert.equal(sha(bytes), "bda904c2e151edb39260150445310b14523b7394c9a5881b6ad4fb278721eb56", "byte-for-byte the PDF that was supplied");
-      assert.ok(bytes.length > 100_000, "the full document, not a stub");
+  describe("Voucher document", () => {
+    it("the default voucher template is the supplied PNG and PDF, unchanged", async () => {
+      const png = await fs.readFile(path.join(TEMPLATE_DIR, "Voucher_Template.png"));
+      assert.equal(sha(png), "ad6399878bc6f60bde5f8cb9118be6c72478880ab8b5aaf870e616c42346bdff", "byte-for-byte the supplied PNG");
+      assert.equal(png.readUInt32BE(16), 2550, "2550 px wide");
+      assert.equal(png.readUInt32BE(20), 3300, "3300 px tall");
+      const pdf = await fs.readFile(path.join(TEMPLATE_DIR, "Voucher_Template.pdf"));
+      assert.equal(sha(pdf), "ee44b8c71931390324c547e543117ba7ebef2aecab97dda31a6dce7596f4dec6", "byte-for-byte the supplied PDF");
+      assert.equal(pdf.subarray(0, 5).toString("ascii"), "%PDF-");
     });
 
     it("vouchers carry the document details but no per-voucher PDF fields", async () => {

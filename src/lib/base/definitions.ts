@@ -210,7 +210,7 @@ export const TABLES: TableSeed[] = [
       { key: "deliverPhone2", name: "Deliver Via Phone 2", type: "phone" },
       { key: "terms", name: "Terms of Trade", type: "longText" },
       { key: "manifestLines", name: "Manifest of Order", type: "longText", options: { help: "One row per line: CLIN | Title | Description | Delivery | Freight #" } },
-      { key: "packLines", name: "Pack Details", type: "longText", options: { help: "One row per line: CLIN | Pack Size | Pallet Config | Per Kit | Qty | Destination (use / for a new line)" } },
+      { key: "packLines", name: "Pack Details", type: "longText", options: { help: "One row per line: CLIN | Pack Size | Pallet Config | Per Kit | Qty" } },
       // Fields of the previous voucher ledger layout. Kept so existing records lose nothing.
       { key: "voucherId", name: "Voucher ID", type: "text", options: { unique: true } },
       { key: "sp", name: "SP", type: "number", options: { format: "integer", min: 0 } },

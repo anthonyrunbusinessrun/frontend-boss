@@ -33,7 +33,7 @@ sh qa/restart-app.sh                              # starts the production build 
 BOSS_URL=http://localhost:3100 python3 qa/base-e2e.py          # tables, views, sidebar, records, sections
 # optional second instance to test server-side filtering with a tiny page size:
 BOSS_SERVER_QUERY_THRESHOLD=5 BOSS_SERVER_PAGE=6 npx next start -p 3101 &
-BOSS_URL=http://localhost:3100 BOSS_URL_SERVER=http://localhost:3101 python3 qa/e2e-update2.py   # create menu, codes, voucher PDF, Forms style, filters
+BOSS_URL=http://localhost:3100 BOSS_URL_SERVER=http://localhost:3101 python3 qa/e2e-update2.py   # create menu, codes, voucher document, Forms style, filters
 ```
 
 The older `qa/interact.py`, `qa/e2e-browser.mjs` and the screenshot-diff scripts target the previous
@@ -89,11 +89,19 @@ reserved. A code sent by a client is ignored and an existing code cannot be chan
 
 ### Voucher PDF
 
-The Vouchers screen shows **one supplied document**: `public/vouchers/Voucher.pdf` (the FEMA / Infant & Toddler sample), for
-every voucher, whichever row is selected. It is displayed in the app (pdf.js), can be opened in a new tab and downloaded
-unchanged. The app does **not** generate, upload or replace voucher PDFs. To change the document, replace that file in
-the project. Voucher details (type, headline, vendor, operated by, deliver via, tracking, manifest rows…) are ordinary
-fields shown in the grid and the record drawer. Voucher number: `LLG-` + type (`FD` or `BL`) + (I + 4000).
+The Vouchers screen shows the **voucher document** of the selected voucher: the default template
+(`public/vouchers/template/Voucher_Template.png` / `.pdf`, as supplied) with that voucher's text drawn on it, using the same
+Saira fonts as the sample vouchers. It redraws as soon as you click another row, pick another voucher in the panel, or edit
+a voucher. "Full size" opens a large view with Print. The app does **not** generate, store, upload or replace voucher PDFs.
+
+Where the text comes from (`src/lib/base/voucherDocument.ts`): Voucher number (ID + Form), Accrue, Form Title, Status (the pill),
+Issued / Perform (codes of the two parties), Reference 1 / 2, Via, Resource, Tracking #, Notes, Manifest (one row per line) and QR.
+The wording that depends on the Form (top title, party labels, the L / R mark, terms of trade) and the names and addresses for known
+codes (FEMA-HQ, LLG, QUOTE, DC-GRC / ATL / TRC / PRC, carriers SAIA and TQL) are reference text read from the sample PDFs
+(`src/data/voucherDirectory.ts`). A voucher can override it with its own optional columns (Vendor Account / Consignee,
+Operated By / Ship To, Deliver Via Phone 1 / 2, Terms of Trade, Manifest of Order, Pack Details): the document prefers the row.
+Layout numbers are in `src/components/base/vouchers/voucherLayout.ts`; `qa/voucher-harness/run.sh` renders the real component in a bare
+page for checking it against the template and the sample PDFs.
 
 ### Filtering
 

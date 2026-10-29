@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownAZ, ArrowUpAZ, ChevronDown, EyeOff, Layers, Maximize2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
@@ -137,13 +137,17 @@ function HeaderMenu({ field, anchor, onClose, onEditField }: { field: FieldDef; 
   );
 }
 
-export function GridView({ rows, onOpen, onCreate, onEditField, onAddField }: ViewProps) {
+export function GridView({ rows, onOpen, onSelectRow, onCreate, onEditField, onAddField }: ViewProps) {
   const t = useTable();
   const toast = useToast();
   const cols = useMemo(() => visibleFields(t.fields, t.config), [t.fields, t.config]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [active, setActive] = useState<{ id: string; key: string } | null>(null);
+  const activeId = active?.id;
+  useEffect(() => {
+    if (activeId) onSelectRow?.(activeId);
+  }, [activeId, onSelectRow]);
   const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
   const [editAnchor, setEditAnchor] = useState<HTMLElement | null>(null);
   const [menu, setMenu] = useState<{ key: string; el: HTMLElement } | null>(null);

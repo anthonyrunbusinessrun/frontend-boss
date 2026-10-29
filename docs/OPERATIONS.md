@@ -52,8 +52,8 @@ informational advisory is intentional for backend-only access; do not silence it
 
 Legacy anonymous favorites/personal views are retained but not automatically claimed by an authenticated
 user. Review existing owners before a controlled reassignment. Uploaded attachment access now requires login.
-The bundled voucher PDF is also protected at the application URL, but the public GitHub repository already
-contains that sample PDF and seed content. Review repository visibility/content separately if confidential.
+The bundled voucher template (`/vouchers/template/*`) is also protected at the application URL, but the public GitHub
+repository already contains the template files and seed content. Review repository visibility/content separately if confidential.
 
 ## Deployment and checks
 

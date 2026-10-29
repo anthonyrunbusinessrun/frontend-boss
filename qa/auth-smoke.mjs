@@ -78,7 +78,7 @@ try {
     }
     return response;
   }
-  for (const path of ['/api/base/tables/profiles', '/api/files/missing', '/api/base/files/missing', '/api/records/profiles', '/api/airtable', '/vouchers/Voucher.pdf']) {
+  for (const path of ['/api/base/tables/profiles', '/api/files/missing', '/api/base/files/missing', '/api/records/profiles', '/api/airtable', '/vouchers/template/Voucher_Template.png']) {
     assert.equal((await request(path)).status, 401, `Anonymous access: ${path}`);
     assert.equal((await request(path, { headers: { cookie: `boss_uid=${'a'.repeat(32)}` } })).status, 401, `Forged legacy cookie: ${path}`);
   }
@@ -93,7 +93,7 @@ try {
   assert.ok(login.headers.getSetCookie().some((value) => /httponly/i.test(value) && /secure/i.test(value) && /samesite=lax/i.test(value)));
   assert.equal((await request('/api/base/tables/profiles', { cookies: true })).status, 200);
   assert.equal((await request('/profiles', { cookies: true })).status, 200);
-  assert.equal((await request('/vouchers/Voucher.pdf', { cookies: true })).status, 200);
+  assert.equal((await request('/vouchers/template/Voucher_Template.png', { cookies: true })).status, 200);
   assert.equal((await request('/ais', { cookies: true })).status, 200);
   const identity = await request('/api/base/session', { method: 'POST', body: {}, cookies: true });
   assert.equal((await identity.json()).userId, user.id, 'Personal state uses verified identity');

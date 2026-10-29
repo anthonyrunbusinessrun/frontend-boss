@@ -57,7 +57,7 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 - Extra fields hold the details printed on a voucher (accrual date, vendor account, operated by, deliver via, resource,
   tracking, note, terms, manifest rows), hidden in the “Simplified” view. The voucher number is `LLG-` + type + (I + 4000):
   I 11574 with type FD gives `LLG-FD-15574`, as on the supplied PDF. The earlier HTML “Bill of Lading” preview was replaced
-  by the supplied `Voucher.pdf` (see section 10).
+  by the voucher document drawn on the supplied template (see section 10).
 - **QR codes** encode a link to the voucher in this app (`/vouchers?record=…`). The “Run” button generates a QR
   image for vouchers without one and stores it as an attachment.
 - The previous ledger fields (Voucher ID, SP, SVC, Debit, Credit, Balance, Scans, Prefix, Label, ID, Sum, Cover)
@@ -107,12 +107,14 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 - Existing codes are untouched. The unique index is created by the migration; if an existing database already has duplicate
   codes the migration prints a warning and skips the index (the server still blocks new duplicates).
 
-**Voucher PDF.**
-- Every voucher shows the one supplied `Voucher.pdf` (`public/vouchers/Voucher.pdf`). The app does not generate, upload or replace voucher PDFs,
-  and the PDF fields of the previous release (`Original PDF`, `Generated PDF`, `PDF`) were removed from the field list (values already stored are kept).
-- `Voucher.pdf` is an image-only Figma export with no text layer, so the voucher detail fields were read from the picture.
-  They are ordinary fields; nothing fills the PDF from them. Types: FD = Freight Delivery Confirmation (the supplied PDF), BL = Bill of Lading.
-- The preview shows up to 8 pages.
+**Voucher document (template + the row's fields).**
+- The default template is `Voucher_Template.png` / `.pdf` exactly as supplied. Its placeholders (the Invoice 15597 example) are covered and redrawn with the selected voucher's text. The manifest table header is redrawn with a wider Title column, because the samples need long titles on one line.
+- The sample PDFs were used for wording, fonts and sizes. The template is the same design with different page margins and glyph proportions, so the template's own geometry is used.
+- Reference text that is not a table column comes from the sample PDFs: party names and addresses for the codes FEMA-HQ, LLG, QUOTE, DC-GRC, DC-ATL, DC-TRC, DC-PRC; carriers SAIA and TQL (the second phone number is printed on FD and FT only, as in the samples); the top title, party labels and terms of each Form. DC-FTW has no sample, so only its code prints. Unknown codes print the code only.
+- The L / R mark: FD, FT and FQ show "L"; BL and IN show "R" (what the samples show; what the letters mean is not stated).
+- The Manifest column fills the Title column (one row per line); CLIN is taken from a leading `I/T-nnn`. Description, Delivery, Freight #, and the pack table (CLIN, Pack Size, Pallet Config, Per Kit, Qty) stay empty unless the voucher's optional Manifest of Order / Pack Details columns are filled in (`CLIN | Title | Description | Delivery | Freight #` per line).
+- Notes: a line like `Label: value` prints the label in bold; any other line prints in bold. The sheet's Notes mostly hold one line, while the sample PDFs show longer notes.
+- Nothing is generated or stored: the document is drawn in the browser. Printing uses the browser's print dialog.
 
 **Forms table: Style (Work / Vouchers).** The Forms table has no Category column. Its **Style** column is a dropdown with two choices,
 **Work** and **Vouchers** (new forms default to Work), chosen when creating or editing a form (drawer or grid cell). "All Forms" is grouped by Style

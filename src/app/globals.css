@@ -126,3 +126,11 @@ ul {
     animation: none !important;
   }
 }
+
+/* Printing the voucher document from its full-size view: only the document, on a Letter page. */
+@media print {
+  @page { size: letter; margin: 0; }
+  body * { visibility: hidden !important; }
+  [data-voucher-print], [data-voucher-print] * { visibility: visible !important; }
+  [data-voucher-print] { position: fixed; left: 0; top: 0; width: 100vw; background: #fff; }
+}

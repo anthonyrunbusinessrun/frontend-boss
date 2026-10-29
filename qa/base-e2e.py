@@ -12,6 +12,11 @@ from playwright.sync_api import sync_playwright, expect
 BASE = os.environ.get("BOSS_URL", "http://localhost:3100")
 CHROME = os.environ.get("CHROME_PATH", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
 RUN = str(int(time.time()))[-6:]
+
+def sign_in(context, base):
+    """Sign in through the app's own login route (the local fake Auth server accepts this one test user)."""
+    r = context.request.post(base + "/api/auth/login", data={"email": os.environ.get("BOSS_E2E_EMAIL", "admin@example.test"), "password": os.environ.get("BOSS_E2E_PASSWORD", "local-test-password")}, headers={"origin": base})
+    assert r.ok, f"sign-in failed: {r.status} {r.text()[:120]}"
 results, console_errors = [], []
 
 def cleanup():
@@ -129,6 +134,7 @@ def png_bytes(color=(200, 30, 60)):
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"])
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    sign_in(ctx, BASE)
     page = ctx.new_page()
     page.on("console", lambda m: console_errors.append(m.text[:200]) if m.type == "error" else None)
     page.on("pageerror", lambda e: console_errors.append("PAGEERROR " + page.url + " " + str(e)[:120]))
@@ -404,16 +410,20 @@ with sync_playwright() as p:
         expect(sidebar().locator("section[aria-label='My favorites']")).to_contain_text("Action Calendar")
         page.reload(wait_until="load"); page.wait_for_selector("aside[aria-label=Views]")
         expect(sidebar().locator("section[aria-label='My favorites']")).to_contain_text("Action Calendar")
-        # a different browser profile (another user) does not share it
-        other = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
+        # favorites belong to the signed-in account: another browser of the same account sees them,
+        # a browser that has not signed in is sent to the sign-in page
+        other_ctx = browser.new_context(viewport={"width": 1440, "height": 900}); sign_in(other_ctx, BASE); other = other_ctx.new_page()
         other.goto(BASE + "/actions", wait_until="load"); other.wait_for_selector("aside[aria-label=Views]"); other.wait_for_timeout(1200)
-        assert other.locator("section[aria-label='My favorites']").count() == 0
+        assert other.locator("section[aria-label='My favorites']").count() == 1
         other.context.close()
+        anon = browser.new_context(viewport={"width": 1440, "height": 900}).new_page(); anon.goto(BASE + "/actions", wait_until="load")
+        assert "/sign-in" in anon.url and anon.locator("aside[aria-label=Views]").count() == 0
+        anon.context.close()
         item = sidebar().locator("li", has=page.get_by_role("button", name="Action Calendar")).last
         item.hover(); item.get_by_role("button", name="Options for Action Calendar").click()
         page.get_by_role("menuitem", name="Remove from ‘My favorites’").click()
         expect(sidebar().locator("section[aria-label='My favorites']")).to_have_count(0)
-    check("favorite a view: persists after refresh, is per user, and can be removed", favorites)
+    check("favorite a view: persists after refresh, belongs to the signed-in account, and can be removed", favorites)
 
     def favorite_profile():
         go("/profiles")
@@ -687,14 +697,13 @@ with sync_playwright() as p:
         assert [h for h in heads if h][:5] == ["Voucher", "Accrue", "Form", "Form Title", "Status"], heads
         assert "VOUCHERS | Simplified" in page.locator("h1").inner_text()
         panel = page.get_by_role("complementary", name="Voucher tools")
-        expect(panel).to_contain_text("Voucher.pdf")
-        expect(panel.locator("[data-testid=pdf-preview][data-state=ready]")).to_be_visible()
+        expect(panel.locator("[data-testid=voucher-document][data-ready=true]")).to_be_visible()
         panel.get_by_role("button", name=re.compile("^Run")).click()
         expect(page.get_by_text(re.compile(r"Generated \d+ QR codes?")).first).to_be_visible()
         page.wait_for_timeout(500)
         assert page.get_by_role("grid").get_by_role("row").nth(1).locator("img").count() >= 1
         expect(panel.get_by_role("button", name="Run (all up to date)")).to_be_visible()
-    check("Vouchers: FEMA sheet headers, supplied PDF preview, QR generator", vouchers)
+    check("Vouchers: FEMA sheet headers, voucher document, QR generator", vouchers)
 
     def voucher_create_autonumber():
         n0 = page.get_by_role("grid").get_by_role("row").count()

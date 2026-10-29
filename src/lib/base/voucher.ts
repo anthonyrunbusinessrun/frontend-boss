@@ -1,33 +1,16 @@
 import type { RecordRow } from "./types";
 
 /**
- * Voucher document settings and helpers shared by the browser and the PDF generator.
- * The letterhead and the L / FD marks are copied from the supplied sample voucher (LLG-FD-15574).
+ * Voucher numbering and small helpers. The document itself (what is printed where) is `voucherDocument.ts`.
  */
 export const VOUCHER_LETTERHEAD = {
-  company: "Land Logistics",
-  tagline: "Inspired Solutions in a World of Challenges.",
-  lines: ["POST OFFICE BOX 214", "BRANFORD, FLORIDA 32008", "+1 (202) 875-2320", "RAYLAND.COM"],
-  footerName: "LAND LOGISTICS",
-  footerAddress: "304 Suwannee Avenue Branford, Florida 32008",
-  /** Voucher number = prefix + type + (autonumber I + offset): I 11574 with type FD gives LLG-FD-15574. */
+  /** Voucher number = prefix + Form + (ID + offset): ID 11574 with Form FD gives LLG-FD-15574. */
   prefix: "LLG-",
   numberOffset: 4000,
 };
 
-export type VoucherDocType = "FD" | "FT" | "BL" | "FQ" | "IN";
-
-/** Wording and marks that depend on the document type (Form column in FEMA_Vouchers.xlsx). */
-export const VOUCHER_TYPES: Record<VoucherDocType, { title: string; defaultHeadline: string; mark: string; label: string }> = {
-  FD: { title: "Freight Delivery Confirmation", defaultHeadline: "ASN - DELIVERED", mark: "L", label: "Freight Delivery Confirmation" },
-  FT: { title: "Freight In Transit", defaultHeadline: "ASN - IN TRANSIT", mark: "L", label: "ASN In Transit" },
-  BL: { title: "Original | Non Negotiable", defaultHeadline: "BILL OF LADING", mark: "R", label: "Bill of Lading" },
-  FQ: { title: "Freight RFQ", defaultHeadline: "FREIGHT RFQ", mark: "Q", label: "Freight RFQ" },
-  IN: { title: "Invoice", defaultHeadline: "INVOICE", mark: "I", label: "Invoice" },
-};
-
 export const MANIFEST_COLUMNS = ["CLIN", "Title", "Description", "Delivery", "Freight #"] as const;
-export const PACK_COLUMNS = ["CLIN", "Pack Size", "Pallet Config", "Per Kit", "Qty", "Destination"] as const;
+export const PACK_COLUMNS = ["CLIN", "Pack Size", "Pallet Config", "Per Kit", "Qty"] as const;
 
 /** "a | b | c" per line into cells. Missing cells are empty; extra cells are folded into the last column. */
 export function parseRows(text: unknown, columns: number): string[][] {
@@ -49,10 +32,9 @@ export function parseRows(text: unknown, columns: number): string[][] {
 /** Inverse of parseRows, used by the editor's help text and tests. */
 export const joinRows = (rows: string[][]) => rows.map((r) => r.join(" | ")).join("\n");
 
-export function docTypeOf(record: RecordRow): VoucherDocType {
-  const t = record.docType;
-  if (t === "FD" || t === "FT" || t === "BL" || t === "FQ" || t === "IN") return t;
-  return "BL";
+/** The voucher's Form code (FD, FT, BL, FQ, IN…). A voucher without one is treated as a Bill of Lading. */
+export function docTypeOf(record: RecordRow): string {
+  return typeof record.docType === "string" && record.docType ? record.docType : "BL";
 }
 
 export function voucherNumber(record: RecordRow): string {
@@ -67,9 +49,3 @@ export function formatVoucherDate(iso: unknown): string {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return `${m}/${d}/${y}`;
 }
-
-/**
- * The voucher document shown for every voucher: the PDF supplied with the project (public/vouchers/Voucher.pdf).
- * The app does not create, edit, upload or replace voucher PDFs.
- */
-export const VOUCHER_DOCUMENT = { url: "/vouchers/Voucher.pdf", name: "Voucher.pdf" } as const;

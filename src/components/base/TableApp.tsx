@@ -53,6 +53,8 @@ function Workspace({ initialRecordId }: { initialRecordId?: string }) {
   const [fieldEditor, setFieldEditor] = useState<{ key?: string; type?: FieldType } | null>(null);
   const [stock, setStock] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  /** the record last clicked in the grid: the voucher document follows it */
+  const [selectedRow, setSelectedRow] = useState<string | null>(null);
 
   // Keep ?record=<id> in the address so a record can be linked to (the voucher QR code uses this).
   useEffect(() => {
@@ -92,7 +94,7 @@ function Workspace({ initialRecordId }: { initialRecordId?: string }) {
     else if (a.kind === "voucherTools") setPanelOpen((o) => !o);
   };
 
-  const viewProps = { rows, onOpen: open, onCreate: create, onEditField: (key: string) => setFieldEditor({ key }), onAddField: addField };
+  const viewProps = { rows, onOpen: open, onSelectRow: setSelectedRow, onCreate: create, onEditField: (key: string) => setFieldEditor({ key }), onAddField: addField };
 
   const body = (() => {
     if (t.loading) return <div className={s.loading}><Spinner /> Loading…</div>;
@@ -190,7 +192,7 @@ function Workspace({ initialRecordId }: { initialRecordId?: string }) {
               </div>
             )}
           </div>
-          {ui.panel === "voucher" && panelOpen && <VoucherPanel onClose={() => setPanelOpen(false)} focusId={editor?.recordId} />}
+          {ui.panel === "voucher" && panelOpen && <VoucherPanel onClose={() => setPanelOpen(false)} focusId={editor?.recordId ?? selectedRow} />}
         </div>
       </main>
 
