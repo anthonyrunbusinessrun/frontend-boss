@@ -48,7 +48,7 @@ inactive; folios linked to profiles and categories from the old `cord` / `catego
 ## Not done / to confirm
 See `NEEDS_CLARIFICATION.md`. Main points: **no real authentication** (anonymous cookie user only); phone layouts not tuned;
 one intermittent browser-test failure was seen once and not reproduced (likely a test timing race, tests were hardened);
-drag-and-drop was exercised with Playwright's synthetic drags only; Airtable CSV import is not yet mapped onto the new fields.
+drag-and-drop was exercised with Playwright's synthetic drags only; CSV import is not yet mapped onto the new fields.
 
 
 # Update 2
@@ -97,14 +97,14 @@ API routes for records, fields and sections now match only their exact path. Pre
 - Fixed: the document's text-fit measurement is identical on server and first browser render (no hydration error).
 - The favorites browser test now reflects the signed-in-account model of the authentication update.
 
-# Update 5: Vouchers from the full Airtable export
+# Update 5: Vouchers from the full CSV export
 
 - Vouchers seed data regenerated from `Vouchers-VOUCHERS - Simplified.csv` (`scripts/vouchers-csv-to-seed.py`): full multi-line Notes, "Unnamed record" manifest wording, each voucher's VSF link, Reference 2 trimmed.
 - **VSF** is now a link field and **Scans** an attachment field (as in the export). Migration `v6` converts existing databases without overwriting edits (see NEEDS_CLARIFICATION section 11).
 - The voucher document wraps long note lines (as the sample PDFs do).
-- Not imported: the export's Scans/QR files (temporary Airtable download links).
+- Not imported: the export's Scans/QR files (temporary download links).
 
-# Update 6: Actions from the Airtable export
+# Update 6: Actions from the CSV export
 
 - Actions seed data regenerated from `Actions-OPEN ACTIONS - HOT QA NEXT.csv` (`scripts/actions-csv-to-seed.py`): 158 actions, 10 columns (Code, Wk, Accrue, Status, Task Title, Type, Folio, Asn, QA, Sort).
 - New fields **Asn** (multi-link to team profiles) and **Sort**; Status and Type gained the export's values; nothing but Code is required; "All Actions" keeps the export's order. The **Act** checkbox is no longer part of the table (kept, hidden, where it exists).
@@ -121,3 +121,15 @@ API routes for records, fields and sections now match only their exact path. Pre
 | `python3 qa/base-e2e.py` (browser, fresh database, behind the local test sign-in) | 66 / 66 |
 | `python3 qa/e2e-update2.py` (browser, fresh database, with a second server-filter instance) | 35 / 35 |
 | `npm run test:auth` | passes |
+
+# Update 7: automatic Code on existing databases
+
+- Fix: databases created before automatic codes never received the `sequence` setting on the Actions Code, Leads Lead ID and Transactions Trans fields, so the Code was an editable, required input. The migration now sets it (`sync:sequence-options`) and re-checks it on every run.
+- The Actions "Act" checkbox leaves the field list and the record form (`v8`); its values stay in each record.
+- New regression test: a database in the old state is fixed by the migration (the server numbers the Code, a typed Code is ignored, an existing Code cannot change).
+
+# Update 8: the name "Airtable" removed
+
+- Browser title is “BOSS”; README, docs, comments and test names no longer use the word; package name `boss`.
+- Renamed: `src/server/airtable.ts` → `mirror.ts`, `/api/airtable/*` → `/api/mirror/*`, `scripts/import-airtable.py` → `import-csv.py` (env `CSV_EXPORT_DIR`, `MIRROR_IMPORT_URL`), health key `airtableMirror` → `csvMirror`, `.gitignore` `airtable-exports/` → `*-exports/`.
+- Kept deliberately: database table / column names (replicated standby; see NEEDS_CLARIFICATION section 14) and user data (VSF links, four action titles).

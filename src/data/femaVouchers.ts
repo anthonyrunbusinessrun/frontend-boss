@@ -1,5 +1,5 @@
 /**
- * FEMA / Infant & Toddlers vouchers, from the Airtable export of the Vouchers table (16 rows).
+ * FEMA / Infant & Toddlers vouchers, from the CSV export of the Vouchers table (16 rows).
  * Column order matches the export: Voucher, Accrue, Form, Form Title, Status, By, Issued, Reference 1, Perform, Reference 2, Via,
  * Resource, Tracking #, Scans, ID, No, VSF, Manifest, QR, Notes. `voucherNo` and `no` are computed from `i` + `docType` at read time.
  * Scans and QR (attachments) are not part of the seed. Regenerate with scripts/vouchers-csv-to-seed.py.
@@ -19,7 +19,7 @@ export type FemaVoucherSeed = {
   deliverVia: string;
   resource: string;
   tracking: string;
-  /** link to the voucher's record in Airtable */
+  /** link to the voucher's record */
   vsf: string;
   /** one shipment line per line */
   manifest: string;

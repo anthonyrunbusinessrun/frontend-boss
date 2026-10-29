@@ -574,6 +574,14 @@ with sync_playwright() as p:
             go("/concepts", SERVER_BASE); expect(page.get_by_role("grid")).to_be_visible()
         check("Large tables: the same screens still work for tables below the threshold", server_mode_small)
 
+    def product_name():
+        for path in ["/profiles", "/actions", "/vouchers"]:
+            go(path); t = page.title()
+            assert "BOSS" in t and "airtable" not in t.lower(), (path, t)
+        for path in ["/profiles", "/forms", "/items"]:  # screens without imported text that could mention it
+            go(path); assert "airtable" not in page.locator("body").inner_text().lower(), path
+    check("the product is called BOSS: browser title and screens do not mention the old name", product_name)
+
     def no_console_errors():
         real = [e for e in console_errors if "favicon" not in e and "Failed to load resource" not in e]
         assert not real, real[:5]

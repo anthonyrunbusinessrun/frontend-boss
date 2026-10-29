@@ -3,7 +3,7 @@ import "@fontsource-variable/inter";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "BOSS Airtable", template: "%s · BOSS Airtable" },
+  title: { default: "BOSS", template: "%s · BOSS" },
   description: "Business Operating Systems Solutions",
 };
 

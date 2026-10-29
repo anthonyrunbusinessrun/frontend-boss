@@ -17,7 +17,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       database: "connected",
-      airtableMirror: mirror.rows[0],
+      csvMirror: mirror.rows[0],
     });
   } catch {
     return NextResponse.json({ ok: false, database: "unavailable" }, { status: 503 });

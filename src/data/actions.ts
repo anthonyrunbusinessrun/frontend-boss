@@ -2,7 +2,7 @@ import type { ActionRow, RecordSet } from "@/types";
 import { ACTION_EXPORT } from "./actionsExport";
 import { profiles } from "./profiles";
 
-/** The Actions table (158 actions from the Airtable export, in its order). See actionsExport.ts. */
+/** The Actions table (158 actions from the CSV export, in its order). See actionsExport.ts. */
 
 const profileRows = profiles.groups.flatMap((g) => g.rows) as Array<{ id: string; contact: string }>;
 const profileId = (contact: string) => profileRows.find((p) => p.contact.trim().toLowerCase() === contact.trim().toLowerCase())?.id;

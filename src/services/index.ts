@@ -3,7 +3,7 @@
  *
  *   UI component -> service (this file) -> PostgreSQL
  *
- * During local design work without DATABASE_URL, the checked-in Airtable seed
+ * During local design work without DATABASE_URL, the checked-in seed
  * remains available as a fallback. Railway requests read from PostgreSQL.
  */
 import { actions } from "@/data/actions";

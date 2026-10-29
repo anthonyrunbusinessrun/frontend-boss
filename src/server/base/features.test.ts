@@ -445,7 +445,7 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     await q(`UPDATE boss_fields SET options = '{"choices":[{"id":"t1","name":"Tasking","color":"blue"},{"id":"t2","name":"Training","color":"orange"},{"id":"t3","name":"Notice","color":"yellow"}]}'::jsonb WHERE table_slug = 'actions' AND key = 'type'`);
     await q("INSERT INTO boss_fields (table_slug, key, name, type, options, position) VALUES ('actions', 'act', 'Act', 'checkbox', '{}', 7) ON CONFLICT DO NOTHING");
     await q(`UPDATE boss_views SET config = jsonb_set(config, '{sort}', '[{"field":"accrue","dir":"asc"}]'::jsonb) WHERE table_slug = 'actions' AND config->>'key' = 'all'`);
-    await q("DELETE FROM boss_migrations WHERE id = 'v7:actions-export'");
+    await q("DELETE FROM boss_migrations WHERE id IN ('v7:actions-export', 'v8:actions-drop-act-field')");
     const group = (await q("SELECT group_id FROM boss_groups WHERE section_slug = 'actions' LIMIT 1")).rows[0].group_id;
     const demo: Array<[string, string, string, string, string, string, string, boolean, boolean]> = [
       ["A-4642", "2026-07-06", "Review S14 Telemetry Reports", "Tasking", "Ongoing", "FL-1002", "26.28", true, true],
@@ -470,13 +470,14 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     // fields
     assert.deepEqual(b.fields.slice(0, 10).map((f) => f.name), ["Code", "Wk", "Accrue", "Status", "Task Title", "Type", "Folio", "Asn", "QA", "Sort"]);
     assert.deepEqual(b.fields.filter((f) => f.required).map((f) => f.key), ["code"]);
-    assert.ok(b.fields.find((f) => f.key === "act" && f.position >= 100), "the previous Act field is kept, after the export's columns");
+    assert.ok(!b.fields.some((f) => f.key === "act"), "the earlier Act checkbox is no longer a field (it is not in the export)");
+    assert.equal(a("A-4642")!.act, true, "…but its values stay in the records");
     assert.deepEqual(b.fields.find((f) => f.key === "status")!.options.choices!.slice(0, 3).map((c) => c.name), ["Ongoing", "Queue", "Scheduled"], "the original choices keep their place");
     assert.equal(b.fields.find((f) => f.key === "status")!.options.choices!.length, 10);
     assert.equal(b.fields.find((f) => f.key === "type")!.options.choices!.length, 18);
     const all = b.views.find((v) => v.config.key === "all")!;
     assert.equal(all.config.sort.length, 0);
-    assert.ok(all.config.hidden.includes("act"));
+    assert.ok(!all.config.hidden.includes("act"));
 
     // rows
     assert.equal(b.records.length, 158 + 2, "158 from the export + the edited demo action that is not in it + the one a person added");
@@ -495,6 +496,35 @@ describe("automatic codes, form categories, voucher PDFs and server filtering", 
     assert.equal(a("A-4900")!.status, "Queue");
     assert.deepEqual((await applyBaseMigrations(db.pool)).backfills, [], "running it again changes nothing");
     assert.ok(Number((await call("GET", "tables/actions/next/code")).json.value.slice(2)) > 4900, "numbering continues after the highest code (and never reuses an issued one)");
+  });
+
+  it("a database whose Code fields predate automatic codes is fixed: the Code is assigned by the server, not typed", async () => {
+    const { applyBaseMigrations } = await import("./migrate");
+    const q = db.pool.query.bind(db.pool);
+    // the earlier state: no `sequence` setting, Code required and editable
+    await q(`UPDATE boss_fields SET options = (options - 'sequence' - 'unique'), required = TRUE WHERE (table_slug, key) IN (('actions', 'code'), ('leads', 'leadId'), ('transactions', 'trans'))`);
+    let b = await bundle("actions");
+    assert.equal(b.fields.find((f) => f.key === "code")!.options.sequence, undefined, "set up as in the screenshot: the old state");
+    const stuck = await call("POST", "tables/actions/records", { title: "no code typed" });
+    assert.equal(stuck.status, 422, "…where a new action is refused: “Code is required”");
+
+    const report = await applyBaseMigrations(db.pool);
+    assert.ok(report.backfills.some((x) => x.id === "sync:sequence-options" && /3 automatic Code/.test(x.detail)), JSON.stringify(report.backfills));
+    b = await bundle("actions");
+    assert.deepEqual(b.fields.find((f) => f.key === "code")!.options.sequence, { prefix: "A-" });
+    assert.equal(b.fields.find((f) => f.key === "code")!.options.unique, true);
+    assert.deepEqual((await bundle("leads")).fields.find((f) => f.key === "leadId")!.options.sequence, { prefix: "L-" });
+    assert.deepEqual((await bundle("transactions")).fields.find((f) => f.key === "trans")!.options.sequence, { prefix: "", pad: 5 });
+
+    // the server numbers it: the next code is the highest + 1, a typed code is ignored, an existing code cannot change
+    const next = (await call("GET", "tables/actions/next/code")).json.value;
+    const made = await call("POST", "tables/actions/records", { title: "numbered by the server", code: "A-1" });
+    assert.equal(made.status, 201);
+    assert.equal(made.json.code, next);
+    assert.equal((await call("PATCH", `tables/actions/records/${made.json.id}`, { code: "A-2" })).status, 422);
+    assert.equal((await call("POST", "tables/leads/records", { client: "X", title: "lead" })).status, 201);
+    assert.equal((await call("POST", "tables/transactions/records", { voucher: "V-x" })).status, 201);
+    assert.deepEqual((await applyBaseMigrations(db.pool)).backfills, [], "running it again changes nothing");
   });
 
   it("the migration reports no warnings on a fresh database and creates the code indexes", async () => {

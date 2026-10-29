@@ -78,7 +78,7 @@ try {
     }
     return response;
   }
-  for (const path of ['/api/base/tables/profiles', '/api/files/missing', '/api/base/files/missing', '/api/records/profiles', '/api/airtable', '/vouchers/template/Voucher_Template.png']) {
+  for (const path of ['/api/base/tables/profiles', '/api/files/missing', '/api/base/files/missing', '/api/records/profiles', '/api/mirror', '/vouchers/template/Voucher_Template.png']) {
     assert.equal((await request(path)).status, 401, `Anonymous access: ${path}`);
     assert.equal((await request(path, { headers: { cookie: `boss_uid=${'a'.repeat(32)}` } })).status, 401, `Forged legacy cookie: ${path}`);
   }

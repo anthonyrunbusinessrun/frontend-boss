@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Regenerate src/data/actionsExport.ts from an Airtable CSV export of the Actions table
+Regenerate src/data/actionsExport.ts from a CSV export of the Actions table
 (e.g. "Actions-OPEN ACTIONS - HOT QA NEXT.csv").
 
   python3 scripts/actions-csv-to-seed.py path/to/export.csv
@@ -41,7 +41,7 @@ for r in rows:
     })
 
 ts = '''/**
- * The Actions table, from the Airtable export "Actions-OPEN ACTIONS - HOT QA NEXT.csv" (158 actions, in the export's order).
+ * The Actions table, from the CSV export "Actions-OPEN ACTIONS - HOT QA NEXT.csv" (158 actions, in the export's order).
  * Columns: Code, Wk, Accrue, Status, Task Title, Type, Folio, Asn, QA, Sort. Regenerate with scripts/actions-csv-to-seed.py.
  * QA is empty in the export, so it is not listed.
  */

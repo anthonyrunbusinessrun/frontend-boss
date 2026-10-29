@@ -6,8 +6,8 @@ import { ACTION_EXPORT } from "./actionsExport";
 
 const byCode = (code: string) => ACTION_EXPORT.find((a) => a.code === code)!;
 
-/** Expectations are read from the Airtable export "Actions-OPEN ACTIONS - HOT QA NEXT.csv". */
-describe("actions seed data (Airtable export)", () => {
+/** Expectations are read from the CSV export "Actions-OPEN ACTIONS - HOT QA NEXT.csv". */
+describe("actions seed data (CSV export)", () => {
   it("has the export's 158 actions with unique codes, in the export's order", () => {
     assert.equal(ACTION_EXPORT.length, 158);
     assert.equal(new Set(ACTION_EXPORT.map((a) => a.code)).size, 158);

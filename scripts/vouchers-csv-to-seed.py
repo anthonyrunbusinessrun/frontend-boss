@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Regenerate src/data/femaVouchers.ts from an Airtable CSV export of the Vouchers table
+Regenerate src/data/femaVouchers.ts from a CSV export of the Vouchers table
 (e.g. "Vouchers-VOUCHERS - Simplified.csv").
 
   python3 scripts/vouchers-csv-to-seed.py path/to/export.csv
 
 Column -> field: Voucher/No are computed in the app; Accrue (m/d/yyyy) -> accrualDate; Form -> docType; Form Title -> headline;
 Status -> docStatus; By; Issued -> vendorCode; Reference 1 -> contractNo; Perform -> operatorCode; Reference 2 -> reference2;
-Via -> deliverVia; Resource; Tracking # -> tracking; ID -> i; VSF (an Airtable record link) -> vsf;
+Via -> deliverVia; Resource; Tracking # -> tracking; ID -> i; VSF (a link to the voucher record) -> vsf;
 Manifest (a comma-joined list of lines; items containing commas are quoted) -> manifest, one line per row; Notes -> voucherNote.
-Scans and QR are attachments whose links are temporary Airtable URLs: they are NOT read (nothing downloadable is stored in the
+Scans and QR are attachments whose links are temporary download URLs: they are NOT read (nothing downloadable is stored in the
 repository). QR codes are made by the app; Scans are uploaded in the app.
 """
 import csv, io, json, re, sys
@@ -42,7 +42,7 @@ for n, r in enumerate(rows, start=1):
     assert r["Voucher"] == f"LLG-{r['Form']}-{int(r['ID']) + 4000}" and int(r["No"]) == int(r["ID"]) + 1000, f"row {n}: Voucher/No do not follow ID"
 
 ts = '''/**
- * FEMA / Infant & Toddlers vouchers, from the Airtable export of the Vouchers table (16 rows).
+ * FEMA / Infant & Toddlers vouchers, from the CSV export of the Vouchers table (16 rows).
  * Column order matches the export: Voucher, Accrue, Form, Form Title, Status, By, Issued, Reference 1, Perform, Reference 2, Via,
  * Resource, Tracking #, Scans, ID, No, VSF, Manifest, QR, Notes. `voucherNo` and `no` are computed from `i` + `docType` at read time.
  * Scans and QR (attachments) are not part of the seed. Regenerate with scripts/vouchers-csv-to-seed.py.
@@ -62,7 +62,7 @@ export type FemaVoucherSeed = {
   deliverVia: string;
   resource: string;
   tracking: string;
-  /** link to the voucher's record in Airtable */
+  /** link to the voucher's record */
   vsf: string;
   /** one shipment line per line */
   manifest: string;

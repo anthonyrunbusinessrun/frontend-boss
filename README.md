@@ -1,7 +1,6 @@
-# BOSS — internal Airtable-style platform
+# BOSS — internal platform
 
-Next.js 16 (App Router) + React 19 + TypeScript, backed by PostgreSQL. BOSS is our own replacement for the
-Airtable base: tables with typed fields, eight kinds of view, forms, a sidebar the team can organize, and
+Next.js 16 (App Router) + React 19 + TypeScript, backed by PostgreSQL. BOSS is our own product: tables with typed fields, eight kinds of view, forms, a sidebar the team can organize, and
 records that are stored in the database (not in the browser).
 
 ## Run
@@ -153,8 +152,8 @@ Browser API (same-origin, session cookie), all under `/api/base`:
 | `POST /tables/:t/query` | server-side filter / search / sort / page of a table |
 | `POST /files` | upload (images, PDF, text, Word, Excel; ≤ 5 MB; content is checked against its type) |
 
-The older token-protected `/api/records/*` and `/api/airtable/*` routes (used by `scripts/import-airtable.py`)
-are unchanged.
+The older token-protected `/api/records/*` routes and the CSV mirror routes `/api/mirror/*` (used by `scripts/import-csv.py`,
+which reads `CSV_EXPORT_DIR` and `MIRROR_IMPORT_URL`) are token-protected (see `NEEDS_CLARIFICATION.md` section 14 for the rename of the mirror routes).
 
 ## Security notes — read before going live
 

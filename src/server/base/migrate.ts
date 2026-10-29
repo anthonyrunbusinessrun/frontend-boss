@@ -450,6 +450,51 @@ async function backfillsV5(client: PoolClient, report: MigrationReport) {
   );
 }
 
+/**
+ * Settings that make a field behave in a fixed way (a Code the server numbers) were only written when the field was created, so a
+ * database that had the field before they existed never got them: its Code was an editable, required input. This brings every
+ * field up to its definition's `sequence`. It runs on every migration and changes nothing once the fields are right.
+ */
+async function syncSequenceOptions(client: PoolClient, report: MigrationReport) {
+  let fixed = 0;
+  for (const seed of TABLES) {
+    for (const f of seed.fields) {
+      const seq = f.options?.sequence;
+      if (!seq) continue;
+      const res = await client.query(
+        `UPDATE boss_fields SET options = options || jsonb_build_object('sequence', $3::jsonb, 'unique', TRUE), updated_at = NOW()
+         WHERE table_slug = $1 AND key = $2 AND (NOT (options ? 'sequence') OR (options->'sequence') IS DISTINCT FROM $3::jsonb)`,
+        [seed.slug, f.key, JSON.stringify(seq)],
+      );
+      fixed += res.rowCount ?? 0;
+    }
+  }
+  if (fixed > 0) report.backfills.push({ id: "sync:sequence-options", detail: `${fixed} automatic Code field(s) set up` });
+}
+
+/**
+ * The earlier Actions "Act" checkbox is not a column of the Actions export, so it leaves the field list (and with it the record
+ * form). The values stay in each record untouched: adding a field with the key `act` brings them back.
+ */
+async function backfillsV8(client: PoolClient, report: MigrationReport) {
+  const has = (await client.query("SELECT 1 FROM boss_sections WHERE slug = 'actions'")).rowCount;
+  if (!has) return;
+  await once(
+    client,
+    "v8:actions-drop-act-field",
+    async () => {
+      const removed = await client.query("DELETE FROM boss_fields WHERE table_slug = 'actions' AND key = 'act'");
+      const views = await client.query<{ id: string; config: { hidden?: string[] } }>("SELECT id, config FROM boss_views WHERE table_slug = 'actions'");
+      for (const v of views.rows) {
+        if (!(v.config.hidden ?? []).includes("act")) continue;
+        await client.query("UPDATE boss_views SET config = jsonb_set(config, '{hidden}', $2::jsonb), updated_at = NOW() WHERE id = $1", [v.id, JSON.stringify((v.config.hidden ?? []).filter((k) => k !== "act"))]);
+      }
+      return `${removed.rowCount} Act field removed from the field list (values kept in the records)`;
+    },
+    report,
+  );
+}
+
 /** The 16 demo actions the project shipped with before the real Actions export. Used only to recognise untouched ones. */
 const LEGACY_DEMO_ACTIONS: Array<[string, string, string, string, string, string, string, boolean, boolean]> = [
   ["A-4642", "2026-07-06", "Review S14 Telemetry Reports", "Tasking", "Ongoing", "FL-1002", "26.28", true, true],
@@ -471,7 +516,7 @@ const LEGACY_DEMO_ACTIONS: Array<[string, string, string, string, string, string
 ];
 
 /**
- * Actions follow the Airtable export (Actions-OPEN ACTIONS - HOT QA NEXT.csv): Code, Wk, Accrue, Status, Task Title, Type, Folio,
+ * Actions follow the CSV export (Actions-OPEN ACTIONS - HOT QA NEXT.csv): Code, Wk, Accrue, Status, Task Title, Type, Folio,
  * Asn, QA, Sort, and its 158 actions in its order. For a database that already has actions:
  *  - fields are renamed / reordered / given the export's choices, never deleted (Act stays, hidden);
  *  - a demo action that is still exactly as the project shipped it is replaced by the export's values, or removed when
@@ -596,7 +641,7 @@ async function backfillsV7(client: PoolClient, report: MigrationReport) {
 }
 
 /**
- * Vouchers follow the full Airtable export (Vouchers-VOUCHERS - Simplified.csv):
+ * Vouchers follow the full CSV export (Vouchers-VOUCHERS - Simplified.csv):
  *  - VSF becomes a link field (it holds the voucher's record link) and Scans an attachment field;
  *  - Notes get their full text, Manifest the CSV's wording ("Unnamed record"), VSF its link.
  * Careful with existing data: a cell is only replaced when it is blank or still holds the value the earlier seed wrote
@@ -728,7 +773,7 @@ async function freshExtras(client: PoolClient) {
   const merge = (slug: string, id: string, data: Record<string, unknown>) =>
     client.query("UPDATE boss_records SET data = data || $3::jsonb WHERE section_slug = $1 AND record_id = $2", [slug, id, JSON.stringify(data)]);
 
-  // Capabilities: the five System capabilities and four Exceptions are transcribed from the supplied Airtable screenshots.
+  // Capabilities: the five System capabilities and four Exceptions are transcribed from the supplied reference screenshots.
   for (const [i, id] of ["cp1", "cp2", "cp3", "cp4", "cp5", "cp6", "cp7"].entries()) await merge("capabilities", id, { go: true, sort: i + 1, ...(i < 5 ? { area: "System" } : {}) });
   const exceptions: Array<[string, string, string]> = [
     ["Responder Base Camps", "CAP-108", "Land Logistics provides full responder base camp services for FEMA, military, and emergency response operations. Base camps deliver the complete life-support package for mission teams deployed to disaster zones: dining facility, lodging pods, restrooms, hand washing stations, water supply, power generation, and gray water collection."],
@@ -780,6 +825,8 @@ export async function applyBaseMigrations(pool: Pool, opts: { freshSeed?: boolea
     await backfillsV5(client, report);
     await backfillsV6(client, report);
     await backfillsV7(client, report);
+    await backfillsV8(client, report);
+    await syncSequenceOptions(client, report);
     await ensureSequenceIndexes(client, report);
     // Autonumber counters for every table (fields added by an operator later get one on first use).
     for (const seed of TABLES) {

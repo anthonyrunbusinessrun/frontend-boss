@@ -1,5 +1,5 @@
 /**
- * The Actions table, from the Airtable export "Actions-OPEN ACTIONS - HOT QA NEXT.csv" (158 actions, in the export's order).
+ * The Actions table, from the CSV export "Actions-OPEN ACTIONS - HOT QA NEXT.csv" (158 actions, in the export's order).
  * Columns: Code, Wk, Accrue, Status, Task Title, Type, Folio, Asn, QA, Sort. Regenerate with scripts/actions-csv-to-seed.py.
  * QA is empty in the export, so it is not listed.
  */

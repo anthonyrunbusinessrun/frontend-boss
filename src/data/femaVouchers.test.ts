@@ -4,8 +4,8 @@ import { FEMA_VOUCHERS } from "./femaVouchers";
 
 const byI = (i: number) => FEMA_VOUCHERS.find((v) => v.i === i)!;
 
-/** Expectations are read from the Airtable export "Vouchers-VOUCHERS - Simplified.csv". */
-describe("voucher seed data (Airtable export)", () => {
+/** Expectations are read from the CSV export "Vouchers-VOUCHERS - Simplified.csv". */
+describe("voucher seed data (CSV export)", () => {
   it("has the export's 16 vouchers, in order, with ids v1 … v16", () => {
     assert.equal(FEMA_VOUCHERS.length, 16);
     assert.deepEqual(FEMA_VOUCHERS.map((v) => v.i), [11574, 11575, 11576, 11577, 11578, 11579, 11580, 11581, 11588, 11589, 11590, 11591, 11592, 11594, 11595, 11596]);

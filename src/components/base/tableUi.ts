@@ -33,7 +33,7 @@ export interface TableUi {
 
 const create = (singular: string): HeaderAction => ({ id: "create", label: `New ${singular}`, kind: "create", primary: true });
 
-/** The Team Profile form: the people-directory fields from the Airtable “Team Profiles” view. */
+/** The Team Profile form: the people-directory fields of the Team Profiles view. */
 export const TEAM_FIELDS = ["photo", "contact", "name", "sal", "position", "type", "billing", "email", "phone1", "phone1Title", "phone2", "phone2Title", "address", "hardCode", "smsOptIn", "team", "bio"];
 
 export const TABLE_UI: Record<string, TableUi> = {

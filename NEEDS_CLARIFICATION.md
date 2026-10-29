@@ -1,6 +1,6 @@
 # Assumptions and open questions
 
-Everything here was either not determinable from the Airtable screenshots / existing code, or is a choice
+Everything here was either not determinable from the reference screenshots / existing code, or is a choice
 that should be confirmed. Nothing is hidden: each item says what the app does today.
 
 ## 1. Security and users (most important)
@@ -18,7 +18,7 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
   requirements are the same entity. Sections do not nest.
 - Deleting a section moves its views back to the sidebar; no view or record is deleted.
 - A table must keep at least one view (the last one cannot be deleted).
-- “Collaborative / Personal / Locked” follows the Airtable dialog in your screenshot. A locked view can be
+- “Collaborative / Personal / Locked” follows the dialog in your screenshot. A locked view can be
   unlocked only by its owner (any user, for the seeded views, which have no owner).
 - Section collapsed / expanded state is remembered per browser, not per account.
 - Gantt dependencies are a *link to the same table* field. The view offers to create one; there is no
@@ -33,11 +33,11 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 
 - The existing Profiles table is treated as the team directory: the one-time migration marked every existing profile
   as `Team = checked` and `Inactive = unchecked`. Un-check Team for vendors / clients that should not be assignable.
-- Fields were taken from the visible columns of the Airtable “Team Profiles” view (Contact, Hard Code, SMS Opt In,
+- Fields were taken from the visible columns of the “Team Profiles” view (Contact, Hard Code, SMS Opt In,
   Sal, Name, Position, Billing, Type, eMail, Address, Phone 1–3 and titles, Team, Inactive) plus **Photo** and **Bio**.
-  The 57 hidden Airtable fields were not visible, so they are not modeled.
+  The 57 hidden fields were not visible, so they are not modeled.
 - Contact code and eMail must be unique (case-insensitive).
-- The Airtable sidebar's other profile views (Company, Client, Vendor, Fleet, Team Bios, Text Blast…) were not
+- The other profile views in the sidebar (Company, Client, Vendor, Fleet, Team Bios, Text Blast…) were not
   recreated: nothing in the data says how they are filtered. Create them with Filter + Create new…
 
 ## 4. Categories and Folios
@@ -52,8 +52,8 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 ## 5. Vouchers (from the Infant & Toddler screenshot)
 
 - Columns follow the screenshot: **I** (autonumber, starts at 11574), **No** (= I + 1000), **VSF**, **Manifest**, **QR**.
-- **VSF** is a link field: the export holds each voucher's record link (an Airtable URL such as `https://airtable.com/tbl…/rec…`). It opens in a new tab and must be a real link. (Earlier it was a one-option dropdown.) *Manifest* is long text, one shipment line per line.
-- **Scans** is an attachment field, as in the export. The export's one scan (`2026-0709-01_DC_PA.pdf` on voucher 15574) and its QR image files are referenced only by temporary Airtable download links, which are not read or stored: upload the scan in the app, and use the QR generator for the QR column.
+- **VSF** is a link field: the export holds each voucher's record link (a URL to that record in the source system). It opens in a new tab and must be a real link. (Earlier it was a one-option dropdown.) *Manifest* is long text, one shipment line per line.
+- **Scans** is an attachment field, as in the export. The export's one scan (`2026-0709-01_DC_PA.pdf` on voucher 15574) and its QR image files are referenced only by temporary download links, which are not read or stored: upload the scan in the app, and use the QR generator for the QR column.
 - Extra fields hold the details printed on a voucher (accrual date, vendor account, operated by, deliver via, resource,
   tracking, note, terms, manifest rows), hidden in the “Simplified” view. The voucher number is `LLG-` + type + (I + 4000):
   I 11574 with type FD gives `LLG-FD-15574`, as on the supplied PDF. The earlier HTML “Bill of Lading” preview was replaced
@@ -86,12 +86,12 @@ that should be confirmed. Nothing is hidden: each item says what the app does to
 - Packet, Accounts and Registries rows stay in the database; their API entries and screens are gone.
 - Attachments are stored in PostgreSQL (≤ 5 MB each). For many large files, move them to object storage.
 - “Delete field” removes the field from every view and form but keeps the stored values in the records.
-- Imports: `scripts/import-airtable.py` still mirrors Airtable CSVs into `airtable_tables` (read-only). It does not
+- Imports: `scripts/import-csv.py` (it was `import-airtable.py`) still mirrors CSV exports into the `airtable_tables` database table (the table keeps its original name: see section 14) (read-only). It does not
   yet map them onto the new fields.
 
 ## 9. UI
 
-- The look stays BOSS dark navy/red. The Airtable screenshots were used for structure and behavior only.
+- The look stays BOSS dark navy/red. The reference screenshots were used for structure and behavior only.
 - Layout is designed for desktop and tablet widths. Phone layouts are usable but not tuned; the app frame
   still has a 960 px minimum width on most screens.
 - The legacy design-fidelity scripts and the AIS module are not part of the new navigation.
@@ -127,16 +127,16 @@ still has its own Work / Vouchers category in its builder and create dialog and 
 - In server mode (very large tables) search covers stored text, number, date, select and contact values, not linked-record names; grouping, calendar placement and timelines use the loaded page only. A filter on a field derived from another table (“folios in this category”) is refused there.
 - Double-clicking a read-only cell (Code, Voucher No., PDF status…) opens the record.
 
-## 11. Vouchers from the full Airtable export (Vouchers-VOUCHERS - Simplified.csv)
+## 11. Vouchers from the full CSV export (Vouchers-VOUCHERS - Simplified.csv)
 
 - The export has the same 20 columns and 16 vouchers as before. What it adds: the **full Notes** (several lines per voucher), the Manifest wording "Unnamed record" (was "Unnamed manifest"), and each voucher's **VSF** link. Reference 2 had a trailing space on some rows; it is trimmed.
 - The export's Manifest cell is a comma-joined list in which items containing a comma are quoted; the data is stored one line per row (`scripts/vouchers-csv-to-seed.py` does the conversion and can be run again on a newer export).
 - Existing databases: `npm run db:migrate` completes only what is still the old seed value (a note cut to its first line, "Unnamed manifest", the placeholder VSF). A note, link or manifest a person edited is kept. An old numeric Scans value is kept in the record as `scansCount`. A voucher that was deleted is not brought back.
 - The voucher document now prints the full Notes (bold labels) and wraps long note lines as the sample PDFs do.
 
-## 12. Actions from the Airtable export (Actions-OPEN ACTIONS - HOT QA NEXT.csv)
+## 12. Actions from the CSV export (Actions-OPEN ACTIONS - HOT QA NEXT.csv)
 
-- The table follows the export's 10 headers in its order; the earlier **Act** checkbox is not in it (kept, hidden, in databases that have it). The earlier **Title** is now **Task Title**.
+- The table follows the export's 10 headers in its order; the earlier **Act** checkbox is not in it: it leaves the field list and the record form, and its values stay in each record. The earlier **Title** is now **Task Title**.
 - Nothing is required except the generated Code: the export has actions with no title, status, type or date (for example "Untitled Action" rows and undated "Action" rows).
 - **Asn** is a multi-link to team profiles (two rows have two people). The export's `LMF` is not a profile, so it stays as text on that action until a profile with that Contact exists. **Folio** stays text: the export's folio names (for example "FEMA Infant & Toddler Kits") are not rows of the app's Folios table.
 - **Wk** is text (`26.28`, `Action`). **Sort** is a whole number. **QA** is empty in the export, so every action starts unchecked.
@@ -144,3 +144,16 @@ still has its own Work / Vouchers category in its builder and create dialog and 
 - Whitespace around values is trimmed (Task Title, Asn, Folio). The export quotes a Folio that contains a comma (`/// Ray Land, Inc.`); the quotes are removed.
 - "All Actions" no longer sorts by Accrue: the export lists the actions grouped by assignee, then by week and date, and most have no date. The order is kept; sort in the view if you want another.
 - Existing databases: the 16 demo actions the project shipped with (for example "Review S14 Telemetry Reports") are replaced or removed only while untouched. Anything a person edited is kept, with blanks filled; actions added later are kept after the export's. Deleted actions are not brought back.
+
+## 13. Automatic Code on databases created before it existed
+
+The setting that makes a Code automatic (Actions `A-`, Leads `L-`, Transactions 5 digits) used to be written only when the field was created. A database that had the field earlier therefore showed an editable, required Code ("Code is required"). `npm run db:migrate` now sets it on those fields (and on every later migration run it checks they are still right). After it, the Code box in the side modal is read-only and shows the next number.
+
+## 14. The name "Airtable" is gone from BOSS
+
+BOSS is our own product, so the word was removed from everything people read or run: the browser title (now “BOSS”), the README, docs, code comments, test names, the package name (`boss`), the mirror module (`src/server/mirror.ts`), its routes (`/api/mirror/*`, were `/api/airtable/*`), the import script (`scripts/import-csv.py`, environment variables `CSV_EXPORT_DIR` and `MIRROR_IMPORT_URL`) and the health endpoint's `csvMirror` key. Anything outside the repository that calls the old routes, reads `airtableMirror`, or sets `AIRTABLE_CSV_DIR` / `AIRTABLE_IMPORT_URL` must use the new names.
+
+It still appears in three places, on purpose:
+- **Database object names**: the tables `airtable_tables` and `airtable_records`, and the columns `airtable_base_id` and `airtable_table_name` of `boss_sections` (in `db/schema.sql`, `scripts/seed-data.ts`, `src/server/mirror.ts`, `src/app/api/health/route.ts`). The production database is replicated to a standby; renaming tables or columns on a replicated primary has to be planned on both databases (DDL does not replicate), so it was not done here. Say if you want that migration prepared.
+- **Data you entered**: the 16 VSF links are real `airtable.com` record URLs (editing the word would break them) and four action titles mention it (for example “Advanced Airtable Training”). Edit them in the app if you want them changed.
+- **Tests that check those links** (they must match the data).

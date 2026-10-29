@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS boss_records (
 CREATE INDEX IF NOT EXISTS boss_records_section_group_position_idx
   ON boss_records(section_slug, group_id, position);
 
--- Exact, read-only mirror of Airtable CSV exports. The frontend-facing
+-- Exact, read-only mirror of CSV exports. The frontend-facing
 -- boss_* tables above keep their stable typed contract while this pair keeps
 -- every source column without requiring a schema migration for new fields.
 CREATE TABLE IF NOT EXISTS airtable_tables (
@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS airtable_records_table_row_idx
 
 -- ---------------------------------------------------------------------------
 -- Table engine (fields, views, sidebar sections, favorites, files).
--- Purely additive: existing boss_* and airtable_* tables are left untouched.
+-- Purely additive: existing boss_* tables and the CSV mirror tables are left untouched.
 -- `boss_sections.slug` is the table id; record JSON keys are `boss_fields.key`.
 -- ---------------------------------------------------------------------------
 
