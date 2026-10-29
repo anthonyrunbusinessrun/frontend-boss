@@ -60,7 +60,9 @@ describe("sequential codes", () => {
 describe("voucher document helpers", () => {
   it("numbers vouchers like the sample: type + (I + 4000)", () => {
     assert.equal(voucherNumber({ id: "x", i: 11574, docType: "FD" }), "LLG-FD-15574");
+    assert.equal(voucherNumber({ id: "x", i: 11575, docType: "FT" }), "LLG-FT-15575");
     assert.equal(voucherNumber({ id: "x", i: 11575, docType: "BL" }), "LLG-BL-15575");
+    assert.equal(voucherNumber({ id: "x", i: 11595, docType: "IN" }), "LLG-IN-15595");
     assert.equal(voucherNumber({ id: "x", i: 11575 }), "LLG-BL-15575", "legacy vouchers are Bills of Lading");
     assert.equal(voucherNumber({ id: "x" }), "");
     assert.equal(computedVoucherNo({ number: "i", type: "docType", prefix: "LLG-", offset: 4000 }, { id: "x", i: 11574, docType: "FD" }), "LLG-FD-15574");

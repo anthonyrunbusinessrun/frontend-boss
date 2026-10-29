@@ -41,9 +41,33 @@ const rule = (id: string, field: string, op: ViewConfig["filters"][number]["op"]
 
 export const VOUCHER_START = 11574;
 
-/** Fields that belong to the voucher document; hidden in the compact grid views. */
-export const VOUCHER_DOCUMENT_KEYS = ["headline", "docStatus", "accrualDate", "vendorCode", "vendorAccount", "contractNo", "operatorCode", "operatedBy", "consignee", "shipTo", "deliverVia", "deliverPhone", "deliverPhone2", "resource", "tracking", "voucherNote", "terms", "manifestLines", "packLines"];
-export const VOUCHER_LEGACY_KEYS = ["voucherId", "sp", "svc", "debit", "credit", "balance", "scans", "prefix", "label", "ref", "sum", "cover"];
+/** FEMA_Vouchers.xlsx column order (Voucher … Notes). */
+export const VOUCHER_FEMA_ORDER = [
+  "voucherNo",
+  "accrualDate",
+  "docType",
+  "headline",
+  "docStatus",
+  "by",
+  "vendorCode",
+  "contractNo",
+  "operatorCode",
+  "reference2",
+  "deliverVia",
+  "resource",
+  "tracking",
+  "scans",
+  "i",
+  "no",
+  "vsf",
+  "manifest",
+  "qr",
+  "voucherNote",
+] as const;
+
+/** Printed-document extras kept off the FEMA grid (and the ledger view). */
+export const VOUCHER_DOCUMENT_KEYS = ["vendorAccount", "operatedBy", "consignee", "shipTo", "deliverPhone", "deliverPhone2", "terms", "manifestLines", "packLines"];
+export const VOUCHER_LEGACY_KEYS = ["voucherId", "sp", "svc", "debit", "credit", "balance", "prefix", "label", "ref", "sum", "cover"];
 
 export const TABLES: TableSeed[] = [
   /* ------------------------------------------------------------------ profiles */
@@ -156,30 +180,34 @@ export const TABLES: TableSeed[] = [
     name: "Vouchers",
     singular: "voucher",
     fields: [
-      { key: "i", name: "I", type: "autonumber", primary: true, options: { start: VOUCHER_START } },
+      // FEMA_Vouchers.xlsx headers (field keys map to existing record properties where possible).
+      { key: "voucherNo", name: "Voucher", type: "computed", options: { computed: { fn: "voucherNo", number: "i", type: "docType", prefix: "LLG-", offset: 4000 } } },
+      { key: "accrualDate", name: "Accrue", type: "date" },
+      { key: "docType", name: "Form", type: "singleSelect", options: { ...sel(["FD", "FT", "BL", "FQ", "IN"], ["blue", "cyan", "orange", "yellow", "purple"]), defaultValue: "FD", help: "FD = Freight Delivery, FT = In Transit ASN, BL = Bill of Lading, FQ = Freight RFQ, IN = Invoice." } },
+      { key: "headline", name: "Form Title", type: "text", options: { placeholder: "e.g. ASN - DELIVERED", help: "Text of the dark bar at the top of the voucher." } },
+      { key: "docStatus", name: "Status", type: "singleSelect", options: { ...sel(["Issued", "Planned", "BOOKED"], ["gray", "yellow", "green"]), defaultValue: "Issued" } },
+      { key: "by", name: "By", type: "text", options: { placeholder: "e.g. RL3", help: "Operator contact code (matches Profiles Contact)." } },
+      { key: "vendorCode", name: "Issued", type: "text", options: { placeholder: "e.g. FEMA-HQ" } },
+      { key: "contractNo", name: "Reference 1", type: "text", options: { placeholder: "e.g. 70FB7026F00000036" } },
+      { key: "operatorCode", name: "Perform", type: "text", options: { placeholder: "e.g. DC-GRC" } },
+      { key: "reference2", name: "Reference 2", type: "text" },
+      { key: "deliverVia", name: "Via", type: "text", options: { placeholder: "e.g. SAIA" } },
+      { key: "resource", name: "Resource", type: "text" },
+      { key: "tracking", name: "Tracking #", type: "text" },
+      { key: "scans", name: "Scans", type: "number", options: { format: "integer", min: 0 } },
+      { key: "i", name: "ID", type: "autonumber", primary: true, options: { start: VOUCHER_START } },
       { key: "no", name: "No", type: "computed", options: { computed: { fn: "offset", source: "i", add: 1000 } } },
       { key: "vsf", name: "VSF", type: "singleSelect", options: sel(["VSF"], ["blue"]) },
-      { key: "manifest", name: "Manifest", type: "longText", options: { help: "Short summary, for example “I/T-015 · GREENCASTLE · Wipes”." } },
+      { key: "manifest", name: "Manifest", type: "longText", options: { help: "Shipment lines from the FEMA sheet, one per line." } },
       { key: "qr", name: "QR", type: "attachment", options: { imagesOnly: true } },
-      // --- voucher document details (the fields printed on the supplied FEMA / Infant & Toddlers voucher) ---
-      { key: "voucherNo", name: "Voucher No.", type: "computed", options: { computed: { fn: "voucherNo", number: "i", type: "docType", prefix: "LLG-", offset: 4000 } } },
-      { key: "docType", name: "Type", type: "singleSelect", options: { ...sel(["FD", "BL"], ["blue", "orange"]), defaultValue: "FD", help: "FD = Freight Delivery Confirmation, BL = Bill of Lading." } },
-      { key: "docStatus", name: "Status", type: "singleSelect", options: { ...sel(["Issued"], ["gray"]), defaultValue: "Issued" } },
-      { key: "headline", name: "Headline", type: "text", options: { placeholder: "e.g. ASN - DELIVERED", help: "Text of the dark bar at the top of the voucher." } },
-      { key: "accrualDate", name: "Accrual Date", type: "date" },
-      { key: "vendorCode", name: "Vendor Account Code", type: "text", options: { placeholder: "e.g. FEMA-HQ" } },
+      { key: "voucherNote", name: "Notes", type: "longText" },
+      // Extra printed-document details (hidden on the FEMA grid).
       { key: "vendorAccount", name: "Vendor Account", type: "longText", options: { help: "Name and address, one line each." } },
-      { key: "contractNo", name: "Contract / PO No.", type: "text", options: { placeholder: "e.g. 70FB7026F00000036" } },
-      { key: "operatorCode", name: "Operated By Code", type: "text", options: { placeholder: "e.g. DC-GRC" } },
       { key: "operatedBy", name: "Operated By", type: "longText", options: { help: "Name, address and phone, one line each." } },
       { key: "consignee", name: "Consignee", type: "longText" },
       { key: "shipTo", name: "Ship To", type: "longText" },
-      { key: "deliverVia", name: "Deliver Via", type: "text" },
       { key: "deliverPhone", name: "Deliver Via Phone", type: "phone" },
       { key: "deliverPhone2", name: "Deliver Via Phone 2", type: "phone" },
-      { key: "resource", name: "Resource", type: "text" },
-      { key: "tracking", name: "Tracking", type: "text" },
-      { key: "voucherNote", name: "Voucher Note", type: "longText" },
       { key: "terms", name: "Terms of Trade", type: "longText" },
       { key: "manifestLines", name: "Manifest of Order", type: "longText", options: { help: "One row per line: CLIN | Title | Description | Delivery | Freight #" } },
       { key: "packLines", name: "Pack Details", type: "longText", options: { help: "One row per line: CLIN | Pack Size | Pallet Config | Per Kit | Qty | Destination (use / for a new line)" } },
@@ -190,10 +218,9 @@ export const TABLES: TableSeed[] = [
       { key: "debit", name: "Debit", type: "number", options: { format: "currency", min: 0 } },
       { key: "credit", name: "Credit", type: "number", options: { format: "currency", min: 0 } },
       { key: "balance", name: "Balance", type: "number", options: { format: "currency" } },
-      { key: "scans", name: "Scans", type: "number", options: { format: "integer", min: 0 } },
       { key: "prefix", name: "Prefix", type: "text" },
       { key: "label", name: "Label", type: "text" },
-      { key: "ref", name: "ID", type: "text" },
+      { key: "ref", name: "Legacy ID", type: "text" },
       { key: "sum", name: "Sum", type: "number", options: { format: "currency" } },
       { key: "cover", name: "Cover", type: "attachment", options: { imagesOnly: true } },
     ],
@@ -205,12 +232,33 @@ export const TABLES: TableSeed[] = [
         config: {
           sort: [{ field: "i", dir: "asc" }],
           hidden: [...VOUCHER_DOCUMENT_KEYS, ...VOUCHER_LEGACY_KEYS],
-          order: ["i", "no", "vsf", "manifest", "qr", "voucherNo", "docType"],
-          widths: { i: 90, no: 100, vsf: 90, manifest: 240, qr: 120, voucherNo: 140, docType: 70 },
+          order: [...VOUCHER_FEMA_ORDER],
+          widths: {
+            voucherNo: 140,
+            accrualDate: 110,
+            docType: 70,
+            headline: 150,
+            docStatus: 100,
+            by: 70,
+            vendorCode: 100,
+            contractNo: 160,
+            operatorCode: 100,
+            reference2: 140,
+            deliverVia: 80,
+            resource: 120,
+            tracking: 120,
+            scans: 80,
+            i: 90,
+            no: 100,
+            vsf: 70,
+            manifest: 260,
+            qr: 100,
+            voucherNote: 180,
+          },
         },
       },
       { key: "document", name: "Voucher Details", type: "grid", config: { sort: [{ field: "i", dir: "asc" }], hidden: [...VOUCHER_LEGACY_KEYS, "no", "vsf", "manifest", "qr", "consignee", "shipTo"] } },
-      { key: "ledger", name: "Ledger (previous layout)", type: "grid", config: { hidden: ["manifest", "qr", ...VOUCHER_DOCUMENT_KEYS] } },
+      { key: "ledger", name: "Ledger (previous layout)", type: "grid", config: { hidden: ["manifest", "qr", "by", "reference2", ...VOUCHER_DOCUMENT_KEYS, "accrualDate", "docType", "headline", "docStatus", "vendorCode", "contractNo", "operatorCode", "deliverVia", "resource", "tracking", "voucherNote", "voucherNo"] } },
     ],
   },
 

@@ -1,7 +1,9 @@
 import type { Pool, PoolClient } from "pg";
+import { FEMA_VOUCHERS } from "@/data/femaVouchers";
 import { defaultFormConfig } from "@/lib/base/viewDefaults";
-import { TABLES, VOUCHER_DOCUMENT_KEYS, VOUCHER_START, seedViewConfig, type TableSeed } from "@/lib/base/definitions";
+import { TABLES, VOUCHER_DOCUMENT_KEYS, VOUCHER_FEMA_ORDER, VOUCHER_LEGACY_KEYS, VOUCHER_START, seedViewConfig, type TableSeed } from "@/lib/base/definitions";
 import type { FieldDef } from "@/lib/base/types";
+import { choicesFromNames } from "@/lib/base/fields";
 
 /**
  * Applies the table engine's definitions to a database. Safe to run on every start:
@@ -293,6 +295,159 @@ async function backfillsV4(client: PoolClient, report: MigrationReport) {
   );
 }
 
+/** Align the Vouchers table with FEMA_Vouchers.xlsx: headers, Form/Status choices, and the 16 rows. */
+async function backfillsV5(client: PoolClient, report: MigrationReport) {
+  const has = (await client.query("SELECT 1 FROM boss_sections WHERE slug = 'vouchers'")).rowCount;
+  if (!has) return;
+
+  await once(
+    client,
+    "v5:fema-vouchers-table",
+    async () => {
+      const renames: Array<[string, string]> = [
+        ["voucherNo", "Voucher"],
+        ["accrualDate", "Accrue"],
+        ["docType", "Form"],
+        ["headline", "Form Title"],
+        ["docStatus", "Status"],
+        ["vendorCode", "Issued"],
+        ["contractNo", "Reference 1"],
+        ["operatorCode", "Perform"],
+        ["deliverVia", "Via"],
+        ["tracking", "Tracking #"],
+        ["i", "ID"],
+        ["voucherNote", "Notes"],
+        ["ref", "Legacy ID"],
+      ];
+      for (const [key, name] of renames) {
+        await client.query(
+          "UPDATE boss_fields SET name = $2, updated_at = NOW() WHERE table_slug = 'vouchers' AND key = $1 AND name IS DISTINCT FROM $2",
+          [key, name],
+        );
+      }
+
+      // Field positions follow the FEMA sheet (plus extras after).
+      const seed = TABLES.find((t) => t.slug === "vouchers");
+      if (seed) {
+        for (const [i, f] of seed.fields.entries()) {
+          await client.query("UPDATE boss_fields SET position = $2, updated_at = NOW() WHERE table_slug = 'vouchers' AND key = $1", [f.key, i]);
+        }
+      }
+
+      const extendChoices = async (key: string, names: string[], colors: Parameters<typeof choicesFromNames>[1]) => {
+        const row = await client.query<{ options: { choices?: Array<{ id: string; name: string; color: string }>; defaultValue?: string } }>(
+          "SELECT options FROM boss_fields WHERE table_slug = 'vouchers' AND key = $1",
+          [key],
+        );
+        if (!row.rowCount) return;
+        const options = row.rows[0].options ?? {};
+        const choices = [...(options.choices ?? [])];
+        const wanted = choicesFromNames(names, colors);
+        for (const c of wanted) {
+          if (!choices.some((x) => x.name === c.name)) choices.push(c);
+        }
+        await client.query("UPDATE boss_fields SET options = $1::jsonb, updated_at = NOW() WHERE table_slug = 'vouchers' AND key = $2", [
+          JSON.stringify({ ...options, choices }),
+          key,
+        ]);
+      };
+      await extendChoices("docType", ["FD", "FT", "BL", "FQ", "IN"], ["blue", "cyan", "orange", "yellow", "purple"]);
+      await extendChoices("docStatus", ["Issued", "Planned", "BOOKED"], ["gray", "yellow", "green"]);
+
+      const group = await client.query<{ group_id: string }>(
+        "SELECT group_id FROM boss_groups WHERE section_slug = 'vouchers' ORDER BY position ASC LIMIT 1",
+      );
+      const groupId = group.rows[0]?.group_id ?? "active";
+      if (!group.rowCount) {
+        await client.query(
+          `INSERT INTO boss_groups (section_slug, group_id, label, display_count, position)
+           VALUES ('vouchers', $1, 'ACTIVE VOUCHERS', $2, 0)
+           ON CONFLICT (section_slug, group_id) DO UPDATE SET label = EXCLUDED.label, display_count = EXCLUDED.display_count`,
+          [groupId, FEMA_VOUCHERS.length],
+        );
+      } else {
+        await client.query(
+          "UPDATE boss_groups SET label = COALESCE(label, 'ACTIVE VOUCHERS'), display_count = $2 WHERE section_slug = 'vouchers' AND group_id = $1",
+          [groupId, FEMA_VOUCHERS.length],
+        );
+      }
+
+      let upserted = 0;
+      for (const [pos, row] of FEMA_VOUCHERS.entries()) {
+        const data = {
+          id: row.id,
+          i: row.i,
+          accrualDate: row.accrualDate,
+          docType: row.docType,
+          headline: row.headline,
+          docStatus: row.docStatus,
+          by: row.by,
+          vendorCode: row.vendorCode,
+          contractNo: row.contractNo,
+          operatorCode: row.operatorCode,
+          reference2: row.reference2,
+          deliverVia: row.deliverVia,
+          resource: row.resource,
+          tracking: row.tracking,
+          vsf: row.vsf,
+          manifest: row.manifest,
+          voucherNote: row.voucherNote,
+          voucherId: `LLG-${row.docType}-${row.i + 4000}`,
+        };
+        await client.query(
+          `INSERT INTO boss_records (section_slug, record_id, group_id, position, data)
+           VALUES ('vouchers', $1, $2, $3, $4::jsonb)
+           ON CONFLICT (section_slug, record_id) DO UPDATE SET
+             group_id = EXCLUDED.group_id,
+             position = EXCLUDED.position,
+             data = boss_records.data || EXCLUDED.data,
+             updated_at = NOW()`,
+          [row.id, groupId, pos, JSON.stringify(data)],
+        );
+        upserted += 1;
+      }
+
+      const maxI = Math.max(...FEMA_VOUCHERS.map((r) => r.i));
+      await client.query(
+        `INSERT INTO boss_counters (table_slug, key, next_value) VALUES ('vouchers', 'i', $1)
+         ON CONFLICT (table_slug, key) DO UPDATE SET next_value = GREATEST(boss_counters.next_value, EXCLUDED.next_value)`,
+        [maxI + 1],
+      );
+
+      await client.query(
+        `UPDATE boss_sections SET range_from = 1, range_to = $1, range_total = $1, updated_at = NOW() WHERE slug = 'vouchers'`,
+        [FEMA_VOUCHERS.length],
+      );
+
+      const simplified = TABLES.find((t) => t.slug === "vouchers")?.views.find((v) => v.key === "simplified");
+      if (simplified?.config) {
+        const config = seedViewConfig(simplified);
+        await client.query(
+          `UPDATE boss_views SET
+             config = jsonb_set(
+               jsonb_set(
+                 jsonb_set(config, '{order}', $2::jsonb),
+                 '{hidden}', $3::jsonb
+               ),
+               '{widths}', $4::jsonb
+             ),
+             updated_at = NOW()
+           WHERE table_slug = 'vouchers' AND (id = 'view_vouchers_simplified' OR config->>'key' = 'simplified')`,
+          [
+            "view_vouchers_simplified",
+            JSON.stringify(config.order ?? [...VOUCHER_FEMA_ORDER]),
+            JSON.stringify(config.hidden ?? [...VOUCHER_DOCUMENT_KEYS, ...VOUCHER_LEGACY_KEYS]),
+            JSON.stringify(config.widths ?? {}),
+          ],
+        );
+      }
+
+      return `renamed FEMA columns; extended Form/Status; upserted ${upserted} vouchers; counter ≥ ${maxI + 1}`;
+    },
+    report,
+  );
+}
+
 async function backfillsV3(client: PoolClient, report: MigrationReport) {
   // Voucher PDFs are no longer created, uploaded or replaced by the app: every voucher shows the supplied Voucher.pdf.
   // The three PDF fields from the previous release are removed from the field list. Values already stored in records
@@ -383,49 +538,16 @@ async function freshExtras(client: PoolClient) {
   const itemMeta: Record<string, [string, string]> = { i1: ["Feeding", "BF-0001"], i2: ["Feeding", "BF-0002"], i3: ["Feeding", "BF-0003"], i4: ["Diapering", "DP-0001"], i5: ["Feeding", "FD-0001"], i6: ["Hygiene", "HY-0001"], i7: ["Comfort", "CM-0001"], i8: ["Comfort", "CM-0002"], i9: ["Diapering", "DP-0002"], i10: ["Hygiene", "HY-0002"] };
   for (const [id, [category, sku]] of Object.entries(itemMeta)) await merge("items", id, { category, sku, unit: "each", reorderLevel: 100 });
 
-  // Vouchers. v1 carries the fields printed on the supplied FEMA / Infant & Toddler voucher; v2 is a Bill of Lading.
+  // Printed-document extras for the first FEMA sample voucher (LLG-FD-15574). Sheet columns come from seed / v5.
   const terms = "Carrier accepts full responsibility for claim, loss, or damage occurring during transport. All applicable DOT regulations must be observed throughout the duration of haul. Hours of Service limitations must be communicated to shipper prior to or at time of dispatch. Failure to deliver the listed quantity, weight, or configuration may result in rate adjustment or claim deduction. Signed Proof of Delivery is required for freight payment.";
   await merge("vouchers", "v1", {
-    docType: "FD",
-    docStatus: "Issued",
-    headline: "ASN - DELIVERED",
-    vsf: "VSF",
-    manifest: "I/T-015 · GREENCASTLE · Wipes",
-    accrualDate: "2026-07-09",
-    vendorCode: "FEMA-HQ",
     vendorAccount: "Federal Emergency Management Agency\n500 C Street SW\nWashington, DC 20472",
-    contractNo: "70FB7026F00000036",
-    operatorCode: "DC-GRC",
     operatedBy: "FEMA DC Greencastle\n12316 Molly Pitcher Hwy\nGreencastle, PA 17225\n(301) 874-4200",
-    deliverVia: "SAIA LTL Freight",
     deliverPhone: "(609) 807-9228",
     deliverPhone2: "800-456-7296",
-    resource: "LTL EXPRESS",
-    tracking: "5188241",
-    voucherNote: "",
     terms,
     manifestLines: "I/T-015 | I/T-015 · GREENCASTLE · Wipes | Diaper Baby Wipe Fragrance Free | 7/13/2026 | 10859120630",
     packLines: "I/T-015 | 80 Wipes/Bag | 1 Pallet · 220 lbs · 40x48x55 | 24 | 1440 | FEMA DC GREENCASTLE / 12316 Molly Pitcher Highway / Greencastle, PA 17225",
-  });
-  const address = "Land Logistics\n304 SW Suwannee Avenue\nBranford, Florida 32008\n(202) 875-2320";
-  await merge("vouchers", "v2", {
-    docType: "BL",
-    docStatus: "Issued",
-    headline: "BILL OF LADING",
-    vsf: "VSF",
-    manifest: "D/O - LAND BRANFORD HQ · Pallet of Wipes",
-    accrualDate: "2026-07-27",
-    vendorCode: "LLG",
-    vendorAccount: address,
-    operatedBy: address,
-    deliverVia: "Total Quality Logistics",
-    deliverPhone: "(513) 831-2600",
-    resource: "FTL",
-    tracking: "37702098",
-    voucherNote: "Delivery to Branford HQ dock.",
-    terms: "Shipment is tendered in accordance with applicable regulations and contract requirements.",
-    manifestLines: "D/O | D/O - LAND BRANFORD HQ | Pallet of Wipes | 7/28/2026 | 37702098",
-    packLines: "D/O | 80 Wipes/Bag | 1 Pallet | 24 | 1440 | Land Logistics / 304 SW Suwannee Avenue / Branford, Florida 32008",
   });
 }
 
@@ -441,6 +563,7 @@ export async function applyBaseMigrations(pool: Pool, opts: { freshSeed?: boolea
     await backfillsV2(client, report);
     await backfillsV3(client, report);
     await backfillsV4(client, report);
+    await backfillsV5(client, report);
     await ensureSequenceIndexes(client, report);
     // Autonumber counters for every table (fields added by an operator later get one on first use).
     for (const seed of TABLES) {

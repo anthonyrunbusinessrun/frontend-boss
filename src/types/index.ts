@@ -63,13 +63,31 @@ export interface ActionRow {
 
 export interface VoucherRow {
   id: string;
+  /** Autonumber ID from the FEMA sheet (column ID). */
+  i?: number;
+  accrualDate?: string;
+  docType?: "FD" | "FT" | "BL" | "FQ" | "IN";
+  headline?: string;
+  docStatus?: "Issued" | "Planned" | "BOOKED";
+  by?: string;
+  vendorCode?: string;
+  contractNo?: string;
+  operatorCode?: string;
+  reference2?: string;
+  deliverVia?: string;
+  resource?: string;
+  tracking?: string;
+  vsf?: string;
+  manifest?: string;
+  voucherNote?: string;
+  // Legacy ledger columns (kept for older views).
   voucherId: string;
   sp: number;
   svc: string;
   debit: number;
   credit: number;
   balance: number;
-  scans: number;
+  scans?: number;
   prefix: string;
   label: string;
   ref: string;
