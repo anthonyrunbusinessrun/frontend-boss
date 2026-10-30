@@ -25,8 +25,9 @@ export function testVoucherInput(data: SharedData, orderId: string, actor: strin
     deliverVia: shipment.carrier, tracking: shipment.tracking,
     resource: "TEST VIRTUAL INVENTORY",
     manifest: lines.map(l => `${l.name}: ${l.qty} EA to ${destination}`).join("\n"),
-    manifestLines: lines.map(l => `${l.sku} | ${l.name} | ${l.qty} EA (test only) | ${destination} | ${shipment.id}`).join("\n"),
-    packLines: lines.map(l => `${l.sku} | EA | Not specified | 1 | ${l.qty}`).join("\n"),
+    // CLIN is a narrow printed column, and no real contract line has been supplied.
+    manifestLines: lines.map(l => `TEST | ${l.name} | ${l.qty} EA (test only) | ${destination} | ${shipment.id}`).join("\n"),
+    packLines: lines.map(l => `TEST | EA | Not specified | 1 | ${l.qty}`).join("\n"),
     voucherNote: `TEST ONLY: ${order.testRun}\nReceipt of order: ${order.reference}\nASN: ${asn.ref} - generated, NOT SENT\nDelivery: NOT performed or confirmed\nCreated by: ${actor}\nTest SKU codes and locations are assumptions; not FEMA-approved mappings.`,
     terms: "INTERNAL TEST ONLY. No physical goods moved.\nNot an invoice, proof of delivery, signed receipt,\nor authorization to ship. No external transmission.",
   };
