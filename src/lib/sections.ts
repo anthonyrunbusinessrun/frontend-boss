@@ -27,4 +27,6 @@ export function isSectionSlug(value: string): value is SectionSlug {
 }
 
 /** Extra top-level modules shown before the tabs. Empty: AIS was removed from the navigation for now. */
-export const MODULE_TABS: ReadonlyArray<{ slug: string; label: string; href: string; badge?: string }> = [];
+export const MODULE_TABS: ReadonlyArray<{ slug: string; label: string; href: string; badge?: string }> = [
+  { slug: "multiplexer", label: "Multiplexer", href: "/multiplexer", badge: "Shared" },
+];
