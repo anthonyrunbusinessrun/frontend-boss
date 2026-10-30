@@ -17,6 +17,7 @@ const text = z.string().trim().min(1).max(200);
 const id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/);
 const qty = z.number().int().min(1).max(1000000);
 export const CommandSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("runFemaTest"), runId: z.string().regex(/^[0-9]{8}-[A-Z0-9]{1,8}$/) }).strict(),
   z
     .object({
       action: z.literal("savePartner"),
