@@ -49,6 +49,8 @@ export interface TransactionIssue {
 }
 
 export interface Transaction {
+  rawEdi?: string;
+  testRun?: string;
   id: string;
   type: EdiDocType;
   dir: Direction;
@@ -69,6 +71,8 @@ export interface OrderLine {
   qty: number;
 }
 export interface Order {
+  testRun?: string;
+  shipTo?: { name: string; city: string; region: string; country: string };
   reference?: string;
   id: string;
   partnerId: string;
@@ -85,6 +89,7 @@ export interface Order {
 
 export type ShipmentStatus = "preparing" | "transit" | "delivered";
 export interface Shipment {
+  testRun?: string;
   id: string;
   orderId: string;
   tracking: string;

@@ -1,5 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import type { SharedCommand } from "@/lib/shared-contract";
 import { useSharedOperations } from "./useSharedOperations";
 
@@ -126,6 +127,7 @@ export function SharedOperations({
     <section className="shared-operations">
       <style>{`.shared-operations{padding:24px;max-width:1400px;margin:auto;color:inherit}.shared-operations h1{font-size:26px;margin:0 0 10px}.shared-operations p{margin:10px 0}.shared-operations nav{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.shared-operations button,.shared-operations select,.shared-operations input,.shared-operations textarea{font:inherit;padding:9px;border:1px solid #62728a;border-radius:6px;background:transparent;color:inherit}.shared-operations button{cursor:pointer}.shared-operations button:disabled{opacity:.5;cursor:wait}.shared-operations button[aria-pressed=true]{background:#17777b;color:white}.shared-operations form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:16px 0}.shared-operations label{display:flex;flex-direction:column;gap:5px}.shared-operations .shared-table{overflow:auto;max-height:520px}.shared-operations table{border-collapse:collapse;width:100%;text-align:left}.shared-operations th,.shared-operations td{padding:10px;border-bottom:1px solid #61718b66;vertical-align:top}.shared-operations pre{max-width:520px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.shared-operations a{color:#30a3b0}.shared-operations [role=alert]{color:#dc786b}`}</style>
       <h1>Shared operations</h1>
+      <p><Link href={base === "/api/multiplexer" ? "/multiplexer/test" : "/shared/test"}>FEMA scenario test: EDI → inventory → ASN → BOSS voucher</Link></p>
       <p>
         {connected
           ? "● Live updates connected"

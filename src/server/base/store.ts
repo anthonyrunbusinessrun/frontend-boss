@@ -284,6 +284,8 @@ export async function peekCode(pool: Pool, slug: string, key: string): Promise<{
 }
 
 export interface CreateRecordOptions {
+  /** Server-only integration key; checked under the same table lock as inserts. */
+  idempotencyKey?: { field: string; value: string };
   allowedKeys?: ReadonlySet<string>;
   requiredKeys?: ReadonlySet<string>;
 }
@@ -292,6 +294,13 @@ export async function createRecord(pool: Pool, slug: string, input: Record<strin
   assertTable(slug);
   return tx(pool, slug, async (c) => {
     const fields = await loadFields(c, slug);
+    if (opts.idempotencyKey) {
+      const key = opts.idempotencyKey;
+      if (!fields.some(f => f.key === key.field && f.options.unique) || input[key.field] !== key.value)
+        throw new ApiError(422, "An integration key must match a unique field.");
+      const existing = await c.query<{ data: RecordRow }>("SELECT data FROM boss_records WHERE section_slug=$1 AND data->>$2=$3", [slug, key.field, key.value]);
+      if (existing.rows[0]) return existing.rows[0].data;
+    }
     // Fields with a default (for example a form's category) use it when the request does not say.
     const withDefaults: Record<string, unknown> = { ...input };
     for (const f of fields) {
